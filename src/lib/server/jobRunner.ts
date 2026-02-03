@@ -13,9 +13,11 @@ import { generateSummary, generateTts, combineSummariesForTts } from './gemini';
 import {
   SERVER_SUMMARY_COOLDOWN_MS,
   SERVER_TTS_BATCH_SIZE,
+  SERVER_TTS_MAX_CHARS,
   SERVER_TTS_COOLDOWN_MS,
   SERVER_TTS_AUDIO_FORMAT,
   SERVER_TTS_SAMPLE_RATE,
+  jitteredCooldown,
 } from './config';
 import { getOrFetchPokemonDetailsServer } from './pokemon';
 
@@ -53,12 +55,50 @@ async function setProgress(params: {
   await db.setJobProgress(params.jobId, params.stage, params.current, params.total, params.message);
 }
 
-function chunkArray<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    out.push(items.slice(i, i + size));
+type SummaryItem = {
+  id: number;
+  name: string;
+  summary: string;
+  region: string;
+  generationId: number;
+};
+
+/**
+ * Chunk summaries by character limit to stay within TTS model's token limit.
+ * Respects both the max batch size and character limit constraints.
+ */
+function chunkSummariesByCharLimit(
+  summaries: SummaryItem[],
+  maxBatchSize: number,
+  maxChars: number
+): SummaryItem[][] {
+  const batches: SummaryItem[][] = [];
+  let currentBatch: SummaryItem[] = [];
+  let currentChars = 0;
+  const pauseMarker = '\n\n[PAUSE]\n\n';
+
+  for (const summary of summaries) {
+    const textLength = summary.summary.length + (currentBatch.length > 0 ? pauseMarker.length : 0);
+    const wouldExceedChars = currentChars + textLength > maxChars;
+    const wouldExceedSize = currentBatch.length >= maxBatchSize;
+
+    if (wouldExceedChars || wouldExceedSize) {
+      if (currentBatch.length > 0) {
+        batches.push(currentBatch);
+      }
+      currentBatch = [summary];
+      currentChars = summary.summary.length;
+    } else {
+      currentBatch.push(summary);
+      currentChars += textLength;
+    }
   }
-  return out;
+
+  if (currentBatch.length > 0) {
+    batches.push(currentBatch);
+  }
+
+  return batches;
 }
 
 async function processSummaryStage(job: ProcessingJob): Promise<'ok' | 'paused' | 'canceled'> {
@@ -111,9 +151,10 @@ async function processSummaryStage(job: ProcessingJob): Promise<'ok' | 'paused' 
     });
 
     if (idx < job.pokemonIds.length - 1) {
-      const cooldownUntil = new Date(Date.now() + SERVER_SUMMARY_COOLDOWN_MS).toISOString();
+      const cooldownMs = jitteredCooldown(SERVER_SUMMARY_COOLDOWN_MS);
+      const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
       await db.setJobCooldownUntil(job.id, cooldownUntil);
-      const result = await sleepWithJobControl(job.id, SERVER_SUMMARY_COOLDOWN_MS);
+      const result = await sleepWithJobControl(job.id, cooldownMs);
       await db.setJobCooldownUntil(job.id, null);
       if (result !== 'ok') return result;
     }
@@ -146,7 +187,7 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
     });
   }
 
-  const batches = chunkArray(summaries, SERVER_TTS_BATCH_SIZE);
+  const batches = chunkSummariesByCharLimit(summaries, SERVER_TTS_BATCH_SIZE, SERVER_TTS_MAX_CHARS);
   const totalBatches = batches.length;
   const startBatchIndex = Math.max(0, job.current);
 
@@ -216,9 +257,10 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
     });
 
     if (batchIdx < batches.length - 1) {
-      const cooldownUntil = new Date(Date.now() + SERVER_TTS_COOLDOWN_MS).toISOString();
+      const cooldownMs = jitteredCooldown(SERVER_TTS_COOLDOWN_MS);
+      const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
       await db.setJobCooldownUntil(job.id, cooldownUntil);
-      const result = await sleepWithJobControl(job.id, SERVER_TTS_COOLDOWN_MS);
+      const result = await sleepWithJobControl(job.id, cooldownMs);
       await db.setJobCooldownUntil(job.id, null);
       if (result !== 'ok') return result;
     }

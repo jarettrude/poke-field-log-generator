@@ -1,17 +1,10 @@
 /**
- * Application-wide UI and rate-limiting constants.
+ * Application-wide UI constants.
  */
 
 /** Default Pokéball sprite used as a fallback image. */
 export const POKEBALL_IMAGE =
   'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png';
-
-/** Maximum number of summaries to pack into a single TTS request. */
-export const TTS_BATCH_SIZE = 15;
-/** Minimum wait between summary generations to avoid triggering API limits. */
-export const SUMMARY_COOLDOWN_MS = 15000; // 15s between summaries (increased for safety)
-/** Minimum wait between TTS calls to avoid triggering API limits. */
-export const TTS_COOLDOWN_MS = 300000; // 5 min between TTS calls (increased for safety)
 
 /** Available prebuilt Gemini voice profiles for TTS. */
 export const VOICE_OPTIONS = [
