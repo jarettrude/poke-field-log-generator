@@ -1,0 +1,5 @@
+{
+  "name": "Pokédex Field Log Generator",
+  "description": "Generate immersive Pokédex field logs with AI-powered narrative summaries and professional voice narration. Features two-stage pipeline, summary library, and customizable prompts.",
+  "requestFramePermissions": []
+}
