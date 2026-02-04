@@ -99,7 +99,7 @@ export async function generateSummary(details: PokemonDetails, region: string): 
     const prompt = `${systemPrompt}\n\nPOKEMON DATA:\n${pokemonContext}`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         temperature: 0.85,
@@ -142,30 +142,23 @@ export async function generateSummary(details: PokemonDetails, region: string): 
 
 /**
  * Generate TTS audio from text using Gemini. Returns base64-encoded PCM audio.
- *
- * Note: gemini-2.5-flash-preview-tts has an 8,192 token input limit (~6,000 words).
- * Callers should use chunkSummariesByCharLimit() to ensure batches fit within limits.
+ * 
+ * Strategy: Start with gemini-2.5-pro-preview-tts with full retry/backoff logic.
+ * If Pro exhausts all retries, fall back to gemini-2.5-flash-preview-tts.
+ * This effectively doubles our TTS API capacity.
  */
-export async function generateTts(params: {
-  text: string;
-  voiceName: string;
-  isBulk: boolean;
-}): Promise<string> {
-  return withRetry(async () => {
-    const ai = getClient();
-    const baseInstruction = await getActivePrompt('tts');
+export async function generateTts(params: { text: string; voiceName: string }): Promise<string> {
+  const ai = getClient();
+  const instruction = await getActivePrompt('tts');
 
-    const bulkInstruction = params.isBulk
-      ? "\n\nCRITICAL - PAUSE PROTOCOL: Multiple entries follow. At each '[PAUSE]' marker: STOP speaking completely, wait silently for exactly 3 seconds with no sound whatsoever, then begin the next entry cleanly. Do NOT trail off, mumble through, or start the next entry during the pause. Maintain consistent tone throughout all entries."
-      : '';
-
+  const makeTtsRequest = async (model: string) => {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview-tts',
+      model,
       contents: [
         {
           parts: [
             {
-              text: `${baseInstruction}${bulkInstruction}\n\nTEXT:\n${params.text}`,
+              text: `${instruction}\n\nTEXT:\n${params.text}`,
             },
           ],
         },
@@ -186,14 +179,22 @@ export async function generateTts(params: {
     }
 
     return base64Audio;
-  }, MAX_RETRIES_TTS);
-}
+  };
 
-/**
- * Combine multiple summaries into TTS-ready text with pause markers.
- */
-export function combineSummariesForTts(
-  summaries: { id: number; name: string; text: string }[]
-): string {
-  return summaries.map(s => s.text).join('\n\n[PAUSE]\n\n');
+  try {
+    console.log('Attempting TTS with gemini-2.5-pro-preview-tts...');
+    return await withRetry(
+      () => makeTtsRequest('gemini-2.5-pro-preview-tts'),
+      MAX_RETRIES_TTS
+    );
+  } catch (proError) {
+    console.warn(
+      'gemini-2.5-pro-preview-tts exhausted all retries. Falling back to gemini-2.5-flash-preview-tts...'
+    );
+    
+    return await withRetry(
+      () => makeTtsRequest('gemini-2.5-flash-preview-tts'),
+      MAX_RETRIES_TTS
+    );
+  }
 }

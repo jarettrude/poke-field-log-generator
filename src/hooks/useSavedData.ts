@@ -12,10 +12,7 @@ export function useSavedData() {
 
   const refreshData = useCallback(async () => {
     try {
-      const [summaries, audioLogs] = await Promise.all([
-        getAllSummaries(),
-        getAllAudioLogs(),
-      ]);
+      const [summaries, audioLogs] = await Promise.all([getAllSummaries(), getAllAudioLogs()]);
       setSavedSummaries(summaries);
       setSavedAudioLogs(audioLogs);
     } catch (error) {

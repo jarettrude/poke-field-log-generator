@@ -8,12 +8,9 @@
 
 import { getDatabase } from '@/lib/db/adapter';
 import type { ProcessingJob, ProcessingStage } from '@/lib/db/adapter';
-import { splitAudioBySilenceNode } from '@/services/audioSplitterNode';
-import { generateSummary, generateTts, combineSummariesForTts } from './gemini';
+import { generateSummary, generateTts } from './gemini';
 import {
   SERVER_SUMMARY_COOLDOWN_MS,
-  SERVER_TTS_BATCH_SIZE,
-  SERVER_TTS_MAX_CHARS,
   SERVER_TTS_COOLDOWN_MS,
   SERVER_TTS_AUDIO_FORMAT,
   SERVER_TTS_SAMPLE_RATE,
@@ -66,44 +63,6 @@ type SummaryItem = {
   region: string;
   generationId: number;
 };
-
-/**
- * Chunk summaries by character limit to stay within TTS model's token limit.
- * Respects both the max batch size and character limit constraints.
- */
-function chunkSummariesByCharLimit(
-  summaries: SummaryItem[],
-  maxBatchSize: number,
-  maxChars: number
-): SummaryItem[][] {
-  const batches: SummaryItem[][] = [];
-  let currentBatch: SummaryItem[] = [];
-  let currentChars = 0;
-  const pauseMarker = '\n\n[PAUSE]\n\n';
-
-  for (const summary of summaries) {
-    const textLength = summary.summary.length + (currentBatch.length > 0 ? pauseMarker.length : 0);
-    const wouldExceedChars = currentChars + textLength > maxChars;
-    const wouldExceedSize = currentBatch.length >= maxBatchSize;
-
-    if (wouldExceedChars || wouldExceedSize) {
-      if (currentBatch.length > 0) {
-        batches.push(currentBatch);
-      }
-      currentBatch = [summary];
-      currentChars = summary.summary.length;
-    } else {
-      currentBatch.push(summary);
-      currentChars += textLength;
-    }
-  }
-
-  if (currentBatch.length > 0) {
-    batches.push(currentBatch);
-  }
-
-  return batches;
-}
 
 async function processSummaryStage(job: ProcessingJob): Promise<'ok' | 'paused' | 'canceled'> {
   const db = await getDatabase();
@@ -195,16 +154,16 @@ async function processSummaryStage(job: ProcessingJob): Promise<'ok' | 'paused' 
   return 'ok';
 }
 
+/**
+ * Process audio stage: one TTS call per Pokémon.
+ *
+ * Batching was removed because Gemini TTS model truncates/ignores
+ * most of the input when given combined text with multiple entries.
+ */
 async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 'canceled'> {
   const db = await getDatabase();
 
-  const summaries = [] as Array<{
-    id: number;
-    name: string;
-    summary: string;
-    region: string;
-    generationId: number;
-  }>;
+  const summaries: SummaryItem[] = [];
   for (const pokemonId of job.pokemonIds) {
     const s = await db.getSummary(pokemonId);
     if (!s) {
@@ -219,33 +178,32 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
     });
   }
 
-  const batches = chunkSummariesByCharLimit(summaries, SERVER_TTS_BATCH_SIZE, SERVER_TTS_MAX_CHARS);
-  const totalBatches = batches.length;
-  const startBatchIndex = Math.max(0, job.current);
+  const total = summaries.length;
+  const startIndex = Math.max(0, job.current);
 
   await setProgress({
     jobId: job.id,
     stage: 'audio',
-    current: startBatchIndex,
-    total: totalBatches,
+    current: startIndex,
+    total,
     message: 'Starting audio synthesis...',
   });
 
-  for (let batchIdx = startBatchIndex; batchIdx < batches.length; batchIdx++) {
+  for (let idx = startIndex; idx < summaries.length; idx++) {
     const latest = await db.getJob(job.id);
     if (!latest) return 'canceled';
     if (latest.status === 'paused') return 'paused';
     if (latest.status === 'canceled') return 'canceled';
 
-    const batch = batches[batchIdx];
-    if (!batch || batch.length === 0) continue;
+    const summary = summaries[idx];
+    if (!summary) continue;
 
     await setProgress({
       jobId: job.id,
       stage: 'audio',
-      current: batchIdx,
-      total: totalBatches,
-      message: `Synthesizing batch ${batchIdx + 1}/${totalBatches}...`,
+      current: idx,
+      total,
+      message: `Synthesizing audio for #${summary.id} ${summary.name}...`,
     });
 
     let audioData = '';
@@ -254,10 +212,10 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
 
     while (!success && retryCount < MAX_RETRIES) {
       try {
-        const combinedText = combineSummariesForTts(
-          batch.map(s => ({ id: s.id, name: s.name, text: s.summary }))
-        );
-        audioData = await generateTts({ text: combinedText, voiceName: job.voice, isBulk: true });
+        audioData = await generateTts({
+          text: summary.summary,
+          voiceName: job.voice,
+        });
         success = true;
       } catch (error) {
         retryCount++;
@@ -270,9 +228,9 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
         await setProgress({
           jobId: job.id,
           stage: 'audio',
-          current: batchIdx,
-          total: totalBatches,
-          message: `TTS error on batch ${batchIdx + 1}, retrying in ${Math.round(backoffMs / 1000)}s... (${retryCount}/${MAX_RETRIES})`,
+          current: idx,
+          total,
+          message: `TTS error on #${summary.id}, retrying in ${Math.round(backoffMs / 1000)}s... (${retryCount}/${MAX_RETRIES})`,
         });
 
         await db.incrementJobRetry(job.id);
@@ -281,56 +239,26 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
       }
     }
 
-    await setProgress({
-      jobId: job.id,
-      stage: 'audio',
-      current: batchIdx,
-      total: totalBatches,
-      message: `Splitting batch ${batchIdx + 1}/${totalBatches}...`,
+    await db.saveAudioLog({
+      id: summary.id,
+      name: summary.name,
+      region: summary.region,
+      generationId: summary.generationId,
+      voice: job.voice,
+      audioBase64: audioData,
+      audioFormat: SERVER_TTS_AUDIO_FORMAT,
+      sampleRate: SERVER_TTS_SAMPLE_RATE,
     });
-
-    const split = splitAudioBySilenceNode(audioData, batch.length, SERVER_TTS_SAMPLE_RATE);
-
-    // Validate split results - must have expected number of segments
-    if (split.segments.length !== batch.length) {
-      console.warn(
-        `Audio split mismatch for batch: expected ${batch.length} segments, got ${split.segments.length}. ` +
-        `Split points found: ${split.segments.length - 1}. Falling back to equal division.`
-      );
-    }
-
-    for (let j = 0; j < batch.length; j++) {
-      const summary = batch[j];
-      if (!summary) continue;
-      
-      // Use segment if available, otherwise create empty placeholder
-      const segment = split.segments[j];
-      if (!segment) {
-        console.error(`Missing audio segment for ${summary.name} (#${summary.id})`);
-        continue; // Skip saving incomplete audio instead of using full audio
-      }
-
-      await db.saveAudioLog({
-        id: summary.id,
-        name: summary.name,
-        region: summary.region,
-        generationId: summary.generationId,
-        voice: job.voice,
-        audioBase64: segment,
-        audioFormat: SERVER_TTS_AUDIO_FORMAT,
-        sampleRate: SERVER_TTS_SAMPLE_RATE,
-      });
-    }
 
     await setProgress({
       jobId: job.id,
       stage: 'audio',
-      current: batchIdx + 1,
-      total: totalBatches,
-      message: `Saved audio logs for batch ${batchIdx + 1}/${totalBatches}.`,
+      current: idx + 1,
+      total,
+      message: `Saved audio for #${summary.id} ${summary.name}.`,
     });
 
-    if (batchIdx < batches.length - 1) {
+    if (idx < summaries.length - 1) {
       const cooldownMs = jitteredCooldown(SERVER_TTS_COOLDOWN_MS);
       const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
       await db.setJobCooldownUntil(job.id, cooldownUntil);

@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
     const audioId = parseId(id);
-    
+
     if (!audioId) {
       return errorResponse('Invalid ID', 400);
     }

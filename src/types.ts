@@ -68,3 +68,16 @@ export interface CooldownState {
     text: string;
   };
 }
+
+/** Pokemon sprites structure from PokeAPI */
+export interface PokemonSprites {
+  front_default: string | null;
+  other: {
+    dream_world: {
+      front_default: string | null;
+    };
+    'official-artwork': {
+      front_default: string | null;
+    };
+  };
+}

@@ -140,8 +140,11 @@ function chooseSplitPointsNearBoundaries(
       .sort((a, b) => {
         // Prefer candidates closer to ideal point, then longer duration
         const distanceWeight = 0.001; // Small weight for distance
-        return (a.distance * distanceWeight + 1 / a.candidate.durationSamples) -
-               (b.distance * distanceWeight + 1 / b.candidate.durationSamples);
+        return (
+          a.distance * distanceWeight +
+          1 / a.candidate.durationSamples -
+          (b.distance * distanceWeight + 1 / b.candidate.durationSamples)
+        );
       });
 
     let bestCandidate: { candidate: SilenceCandidate; idx: number } | null = null;
@@ -250,7 +253,12 @@ export function splitAudioBySilenceNode(
     exitSilenceRms: 150,
   });
 
-  let splitPoints = chooseSplitPointsNearBoundaries(pass1, expectedSplits, samples.length, sampleRate);
+  let splitPoints = chooseSplitPointsNearBoundaries(
+    pass1,
+    expectedSplits,
+    samples.length,
+    sampleRate
+  );
 
   if (splitPoints.length < expectedSplits) {
     const pass2 = findSilenceCandidates({
@@ -261,7 +269,12 @@ export function splitAudioBySilenceNode(
       enterSilenceRms: 50,
       exitSilenceRms: 100,
     });
-    splitPoints = chooseSplitPointsNearBoundaries(pass2, expectedSplits, samples.length, sampleRate);
+    splitPoints = chooseSplitPointsNearBoundaries(
+      pass2,
+      expectedSplits,
+      samples.length,
+      sampleRate
+    );
   }
 
   if (splitPoints.length < expectedSplits) {
@@ -294,7 +307,7 @@ export function splitAudioBySilenceNode(
   if (segments.length !== expectedCount) {
     console.warn(
       `Audio split produced ${segments.length} segments, expected ${expectedCount}. ` +
-      `Split points: ${splitPoints.length}`
+        `Split points: ${splitPoints.length}`
     );
     // Pad with empty buffers or redistribute if needed
     while (segments.length < expectedCount) {

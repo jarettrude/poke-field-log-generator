@@ -37,7 +37,7 @@ export function usePokemonData() {
       ]);
       setPokemonList(list);
       setCurrentRegion(genInfo.region);
-      
+
       if (list.length > 0) {
         const ids = list.map(p => p.id);
         setRangeStart(Math.min(...ids));

@@ -16,11 +16,11 @@ interface ApiResponse<T> {
 
 async function handleResponse<T>(response: Response): Promise<T> {
   const result = (await response.json()) as ApiResponse<T>;
-  
+
   if (!result.success || !result.data) {
     throw new Error(result.error || 'Unknown API error');
   }
-  
+
   return result.data;
 }
 

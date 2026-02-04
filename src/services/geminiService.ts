@@ -76,7 +76,7 @@ export const createSingleSummary = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash', // Using stable model for reliability
+      model: 'gemini-3-flash-preview', // Using latest Gemini 3 Flash for improved performance
       contents: prompt,
       config: {
         temperature: 0.85,
@@ -103,14 +103,13 @@ export const createSingleSummary = async (
 };
 
 /**
- * Generate TTS audio for one or more field log entries.
+ * Generate TTS audio for a single field log entry.
  *
  * Returns base64-encoded PCM audio.
  */
 export const generateTTS = async (
   text: string,
   voiceName: string = 'Kore',
-  isBulk: boolean = false,
   retryCount = 0
 ): Promise<string> => {
   if (typeof window !== 'undefined') {
@@ -119,11 +118,7 @@ export const generateTTS = async (
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  const baseInstruction = await getPrompt('tts');
-
-  const bulkInstruction = isBulk
-    ? "\n\nCRITICAL: Multiple entries provided. Pause for exactly 3 seconds at every '[PAUSE]' marker. Maintain consistent tone and pacing throughout."
-    : '';
+  const instruction = await getPrompt('tts');
 
   try {
     const response = await ai.models.generateContent({
@@ -132,7 +127,7 @@ export const generateTTS = async (
         {
           parts: [
             {
-              text: `${baseInstruction}${bulkInstruction}\n\nTEXT:\n${text}`,
+              text: `${instruction}\n\nTEXT:\n${text}`,
             },
           ],
         },
@@ -158,21 +153,10 @@ export const generateTTS = async (
     return handleApiError(
       error as { message?: string; status?: number },
       retryCount,
-      () => generateTTS(text, voiceName, isBulk, retryCount + 1),
+      () => generateTTS(text, voiceName, retryCount + 1),
       5 // Max 5 retries for TTS
     );
   }
-};
-
-/**
- * Combine multiple summaries into TTS-ready text with pause markers.
- *
- * The Gemini TTS prompt expects `[PAUSE]` markers between entries.
- */
-export const combineSummariesForTTS = (
-  summaries: { id: number; name: string; text: string }[]
-): string => {
-  return summaries.map(s => s.text).join('\n\n[PAUSE]\n\n');
 };
 
 /**

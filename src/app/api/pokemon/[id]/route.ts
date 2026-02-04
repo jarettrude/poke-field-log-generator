@@ -45,7 +45,7 @@ async function downloadImage(url: string | null, filename: string): Promise<stri
   try {
     const response = await fetch(url);
     if (!response.ok) return null;
-    
+
     const buffer = await response.arrayBuffer();
     await fs.writeFile(path.join(POKEMON_IMAGE_DIR, filename), Buffer.from(buffer));
     return `/pokemon/${filename}`;

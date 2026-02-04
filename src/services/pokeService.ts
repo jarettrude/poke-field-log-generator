@@ -3,7 +3,7 @@
  * Fetches from PokeAPI and caches to SQLite via backend
  */
 
-import { PokemonDetails, PokemonBaseInfo } from '../types';
+import { PokemonDetails, PokemonBaseInfo, PokemonSprites } from '../types';
 
 const BASE_URL = 'https://pokeapi.co/api/v2';
 const API_BASE = '/api';
@@ -38,14 +38,7 @@ interface PokemonResponse {
   height: number;
   weight: number;
   species: { url: string };
-  sprites: {
-    front_default: string | null;
-    other: {
-      dream_world: {
-        front_default: string | null;
-      };
-    };
-  };
+  sprites: PokemonSprites;
   types: Array<{ type: { name: string } }>;
   moves: Array<{ move: { name: string } }>;
 }
@@ -115,11 +108,11 @@ interface ApiResponse<T> {
 
 async function handleResponse<T>(response: Response): Promise<T | null> {
   const result = (await response.json()) as ApiResponse<T>;
-  
+
   if (!result.success) {
     throw new Error(result.error || 'Unknown API error');
   }
-  
+
   return result.data ?? null;
 }
 
@@ -175,8 +168,8 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
     .filter((entry: { language: { name: string } }) => entry.language.name === 'en')
     .map((entry: { flavor_text: string }) => entry.flavor_text.replace(/[\n\f]/g, ' '));
 
-  const imagePngUrl = pokemonData.sprites.front_default;
-  const imageSvgUrl = pokemonData.sprites.other.dream_world.front_default;
+  const imagePngUrl = pokemonData.sprites.other['official-artwork'].front_default;
+  const imageSvgUrl = pokemonData.sprites.other['dream_world'].front_default;
 
   // Cache to database (images will be downloaded by backend)
   const saveResponse = await fetch(`${API_BASE}/pokemon/${id}`, {
@@ -194,7 +187,7 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
       imageSvgUrl,
     }),
   });
-  
+
   await handleResponse(saveResponse);
 
   // Fetch again to get local image paths

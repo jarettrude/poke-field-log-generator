@@ -78,7 +78,8 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         try {
           const res = await fetch(`/api/pokemon/${id}`);
           if (res.ok) {
-            const data = await res.json();
+            const response = await res.json();
+            const data = response.data;
             if (data && (data.imagePngPath || data.imageSvgPath)) {
               newImages.set(id, {
                 id,
@@ -261,16 +262,21 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
 
       try {
         const cachedPokemonRes = await fetch(`/api/pokemon/${entry.id}`);
-        const cachedPokemon = (await cachedPokemonRes.json()) as {
-          imagePngPath?: string | null;
-          imageSvgPath?: string | null;
+        const response = (await cachedPokemonRes.json()) as {
+          success: boolean;
+          data?: {
+            imagePngPath?: string | null;
+            imageSvgPath?: string | null;
+          };
         };
 
-        if (cachedPokemon.imageSvgPath) {
+        const cachedPokemon = response.data;
+
+        if (cachedPokemon?.imageSvgPath) {
           const svgRes = await fetch(cachedPokemon.imageSvgPath);
           const svgBlob = await svgRes.blob();
           folder.file(`${filePrefix}.svg`, svgBlob);
-        } else if (cachedPokemon.imagePngPath) {
+        } else if (cachedPokemon?.imagePngPath) {
           const pngRes = await fetch(cachedPokemon.imagePngPath);
           const pngBlob = await pngRes.blob();
           folder.file(`${filePrefix}.png`, pngBlob);
@@ -561,7 +567,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           const hasText = !!entry.summary;
           const hasAudio = !!entry.audio;
           const cachedImage = pokemonImages.get(entry.id);
-          const imageSrc = cachedImage?.imagePngPath || cachedImage?.imageSvgPath;
+          const imageSrc = cachedImage?.imageSvgPath || cachedImage?.imagePngPath;
 
           return (
             <div

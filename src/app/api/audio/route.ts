@@ -29,14 +29,21 @@ export async function POST(request: Request) {
     const { id, name, region, generationId, voice, audioBase64, audioFormat, sampleRate } = body;
 
     if (
-      typeof id !== 'number' || id <= 0 ||
-      typeof name !== 'string' || !name ||
-      typeof region !== 'string' || !region ||
-      typeof generationId !== 'number' || generationId <= 0 ||
-      typeof voice !== 'string' || !voice ||
-      typeof audioBase64 !== 'string' || !audioBase64 ||
+      typeof id !== 'number' ||
+      id <= 0 ||
+      typeof name !== 'string' ||
+      !name ||
+      typeof region !== 'string' ||
+      !region ||
+      typeof generationId !== 'number' ||
+      generationId <= 0 ||
+      typeof voice !== 'string' ||
+      !voice ||
+      typeof audioBase64 !== 'string' ||
+      !audioBase64 ||
       (audioFormat !== 'pcm_s16le' && audioFormat !== 'wav') ||
-      typeof sampleRate !== 'number' || sampleRate <= 0
+      typeof sampleRate !== 'number' ||
+      sampleRate <= 0
     ) {
       return errorResponse('Missing or invalid required fields', 400);
     }
@@ -70,12 +77,14 @@ export async function DELETE(request: Request) {
       return errorResponse('Missing or invalid ids array', 400);
     }
 
-    const uniqueIds = Array.from(new Set(
-      ids
-        .map(id => Number(id))
-        .filter(id => Number.isFinite(id) && id > 0)
-        .map(id => Math.trunc(id))
-    ));
+    const uniqueIds = Array.from(
+      new Set(
+        ids
+          .map(id => Number(id))
+          .filter(id => Number.isFinite(id) && id > 0)
+          .map(id => Math.trunc(id))
+      )
+    );
 
     if (uniqueIds.length === 0) {
       return errorResponse('No valid IDs provided', 400);

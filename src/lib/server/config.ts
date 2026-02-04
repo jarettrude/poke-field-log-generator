@@ -10,13 +10,12 @@
  * gemini-2.5-flash-preview-tts (audio generation):
  *   - RPM: 10 | TPM: 10K | RPD: 100
  *   - Preview model with RESTRICTIVE limits
- *   - Input token limit: 8,192 tokens (~6,000 words max)
  *   - Must space TTS calls at least 6s apart (we use 5min for safety)
- *   - Max ~100 TTS batches per day = ~1,200 Pokémon with audio (at batch size 12)
+ *   - Max ~100 TTS calls per day
+ *
+ * NOTE: Batching multiple entries into a single TTS call does NOT work reliably.
+ * The model truncates/ignores most of the input. We now use one TTS call per Pokémon.
  */
-
-export const SERVER_TTS_BATCH_SIZE = 12;
-export const SERVER_TTS_MAX_CHARS = 12000;
 
 export const SERVER_SUMMARY_COOLDOWN_MS = 15000;
 export const SERVER_TTS_COOLDOWN_MS = 300000;

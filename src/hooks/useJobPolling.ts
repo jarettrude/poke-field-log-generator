@@ -1,19 +1,23 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { getJob } from '@/services/jobsService';
 import { useToast } from '@/components/ToastProvider';
-import {
-  getSummariesByGeneration,
-  getAudioLogsByGeneration,
-} from '@/services/storageService';
+import { getSummariesByGeneration, getAudioLogsByGeneration } from '@/services/storageService';
 import { ProcessedPokemon, CooldownState } from '@/types';
 
 interface UseJobPollingProps {
-  onJobComplete?: (results: ProcessedPokemon[], mode: 'FULL' | 'SUMMARY_ONLY' | 'AUDIO_ONLY') => void;
+  onJobComplete?: (
+    results: ProcessedPokemon[],
+    mode: 'FULL' | 'SUMMARY_ONLY' | 'AUDIO_ONLY'
+  ) => void;
   onJobFailed?: (error: string) => void;
   onJobCanceled?: () => void;
 }
 
-export function useJobPolling({ onJobComplete, onJobFailed, onJobCanceled }: UseJobPollingProps = {}) {
+export function useJobPolling({
+  onJobComplete,
+  onJobFailed,
+  onJobCanceled,
+}: UseJobPollingProps = {}) {
   const { showToast } = useToast();
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -53,10 +57,15 @@ export function useJobPolling({ onJobComplete, onJobFailed, onJobCanceled }: Use
       if (!summary || !audio) continue;
 
       const cachedPokemonRes = await fetch(`/api/pokemon/${id}`);
-      const cachedPokemon = (await cachedPokemonRes.json().catch(() => null)) as {
-        imagePngPath?: string | null;
-        imageSvgPath?: string | null;
+      const response = (await cachedPokemonRes.json().catch(() => null)) as {
+        success: boolean;
+        data?: {
+          imagePngPath?: string | null;
+          imageSvgPath?: string | null;
+        };
       } | null;
+
+      const cachedPokemon = response?.data || null;
 
       results.push({
         id,
@@ -135,12 +144,12 @@ export function useJobPolling({ onJobComplete, onJobFailed, onJobCanceled }: Use
 
           // We don't load saved summaries/audio here directly as that's app state,
           // but we can optionally return results if needed.
-          
+
           let results: ProcessedPokemon[] = [];
           if (job.mode !== 'SUMMARY_ONLY') {
-             results = await buildResultsForJob(job);
+            results = await buildResultsForJob(job);
           }
-          
+
           onJobComplete?.(results, job.mode);
         }
       } catch (e) {

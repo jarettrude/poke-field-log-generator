@@ -449,13 +449,13 @@ export class SQLiteAdapter implements DatabaseAdapter {
   async recoverStalledJobs(stalledThresholdMs: number): Promise<number> {
     const now = new Date();
     const cutoff = new Date(now.getTime() - stalledThresholdMs).toISOString();
-    
+
     const stmt = this.db!.prepare(
       `UPDATE jobs 
        SET status = 'queued', message = 'Recovered from stalled state', updated_at = ? 
        WHERE status = 'running' AND updated_at < ?`
     );
-    
+
     const result = stmt.run(now.toISOString(), cutoff);
     return result.changes;
   }

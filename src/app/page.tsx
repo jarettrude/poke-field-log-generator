@@ -48,11 +48,7 @@ function HomeInner() {
     handleGenChange,
   } = usePokemonData();
 
-  const {
-    savedSummaries,
-    savedAudioLogs,
-    refreshData: refreshSavedData,
-  } = useSavedData();
+  const { savedSummaries, savedAudioLogs, refreshData: refreshSavedData } = useSavedData();
 
   const {
     activeJobId,

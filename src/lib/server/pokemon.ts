@@ -5,7 +5,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { getDatabase } from '@/lib/db/adapter';
-import type { PokemonDetails } from '@/types';
+import { PokemonDetails, PokemonSprites } from '../../types';
 
 const BASE_URL = 'https://pokeapi.co/api/v2';
 const POKEMON_IMAGE_DIR = path.join(process.cwd(), 'public', 'pokemon');
@@ -16,14 +16,7 @@ type PokemonResponse = {
   height: number;
   weight: number;
   species: { url: string };
-  sprites: {
-    front_default: string | null;
-    other: {
-      dream_world: {
-        front_default: string | null;
-      };
-    };
-  };
+  sprites: PokemonSprites;
   types: Array<{ type: { name: string } }>;
   moves: Array<{ move: { name: string } }>;
 };
@@ -119,7 +112,7 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
     .filter(entry => entry.language.name === 'en')
     .map(entry => entry.flavor_text.replace(/[\n\f]/g, ' '));
 
-  const imagePngUrl = pokemonData.sprites.front_default;
+  const imagePngUrl = pokemonData.sprites.other['official-artwork'].front_default;
   const imageSvgUrl = pokemonData.sprites.other.dream_world.front_default;
 
   const { imagePngPath, imageSvgPath } = await downloadSpriteAssets({
