@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import Image from 'next/image';
 import {
   Search,
   Download,
@@ -10,6 +11,7 @@ import {
   X,
   Check,
   ImageIcon,
+  Trash2,
 } from 'lucide-react';
 import { StoredSummary, StoredAudioLog } from '../services/storageService';
 import { formatPokemonId } from '../utils/pokemonUtils';
@@ -32,13 +34,27 @@ interface PokedexEntry {
   imageSvgPath?: string | null;
 }
 
+interface CachedPokemonImage {
+  id: number;
+  imagePngPath?: string | null;
+  imageSvgPath?: string | null;
+}
+
 interface PokedexLibraryViewProps {
   summaries: StoredSummary[];
   audioLogs: StoredAudioLog[];
   onRefresh: () => void;
+  onDeleteSummaries?: (ids: number[]) => Promise<void>;
+  onDeleteAudio?: (ids: number[]) => Promise<void>;
 }
 
-export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({ summaries, audioLogs }) => {
+export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
+  summaries,
+  audioLogs,
+  onRefresh,
+  onDeleteSummaries,
+  onDeleteAudio,
+}) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [generationFilter, setGenerationFilter] = useState<number | 'all'>('all');
   const [regionFilter, setRegionFilter] = useState<string | 'all'>('all');
@@ -50,6 +66,56 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({ summarie
   );
   const [rangeStart, setRangeStart] = useState<number>(1);
   const [rangeEnd, setRangeEnd] = useState<number>(151);
+  const [pokemonImages, setPokemonImages] = useState<Map<number, CachedPokemonImage>>(new Map());
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const fetchImages = async () => {
+      const allIds = new Set([...summaries.map(s => s.id), ...audioLogs.map(a => a.id)]);
+      const newImages = new Map<number, CachedPokemonImage>();
+
+      for (const id of allIds) {
+        try {
+          const res = await fetch(`/api/pokemon/${id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && (data.imagePngPath || data.imageSvgPath)) {
+              newImages.set(id, {
+                id,
+                imagePngPath: data.imagePngPath,
+                imageSvgPath: data.imageSvgPath,
+              });
+            } else {
+              // Fallback to PokeAPI sprites
+              newImages.set(id, {
+                id,
+                imagePngPath: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
+                imageSvgPath: null,
+              });
+            }
+          } else {
+            // API returned error, use PokeAPI fallback
+            newImages.set(id, {
+              id,
+              imagePngPath: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
+              imageSvgPath: null,
+            });
+          }
+        } catch {
+          // Fetch failed, use PokeAPI fallback
+          newImages.set(id, {
+            id,
+            imagePngPath: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
+            imageSvgPath: null,
+          });
+        }
+      }
+
+      setPokemonImages(newImages);
+    };
+
+    fetchImages();
+  }, [summaries, audioLogs]);
 
   const entries = useMemo(() => {
     const entryMap = new Map<number, PokedexEntry>();
@@ -180,15 +246,17 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({ summarie
       const folder = zip.folder(`${formatPokemonId(entry.id)}-${entry.name}`);
       if (!folder) continue;
 
+      const filePrefix = `${formatPokemonId(entry.id)}-${entry.name}`;
+
       if (entry.summary) {
-        folder.file('field-log.txt', entry.summary);
+        folder.file(`${filePrefix}.txt`, entry.summary);
       }
 
       if (entry.audio) {
         const audioBlob = await fetch(
           pcmToWav(entry.audio.audioBase64, entry.audio.sampleRate)
         ).then(res => res.blob());
-        folder.file('audio.wav', audioBlob);
+        folder.file(`${filePrefix}.wav`, audioBlob);
       }
 
       try {
@@ -201,11 +269,11 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({ summarie
         if (cachedPokemon.imageSvgPath) {
           const svgRes = await fetch(cachedPokemon.imageSvgPath);
           const svgBlob = await svgRes.blob();
-          folder.file('sprite.svg', svgBlob);
+          folder.file(`${filePrefix}.svg`, svgBlob);
         } else if (cachedPokemon.imagePngPath) {
           const pngRes = await fetch(cachedPokemon.imagePngPath);
           const pngBlob = await pngRes.blob();
-          folder.file('sprite.png', pngBlob);
+          folder.file(`${filePrefix}.png`, pngBlob);
         }
       } catch (e) {
         console.warn(`Failed to fetch images for ${entry.name}:`, e);
@@ -221,6 +289,58 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({ summarie
     URL.revokeObjectURL(url);
   };
 
+  const handleDeleteSummaries = async () => {
+    if (!onDeleteSummaries || selectedIds.size === 0) return;
+    if (!confirm(`Delete text summaries for ${selectedIds.size} Pokémon?`)) return;
+
+    setIsDeleting(true);
+    try {
+      await onDeleteSummaries(Array.from(selectedIds) as number[]);
+      setSelectedIds(new Set());
+      onRefresh();
+    } catch (e) {
+      console.error('Failed to delete summaries:', e);
+      alert('Failed to delete summaries. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteAudio = async () => {
+    if (!onDeleteAudio || selectedIds.size === 0) return;
+    if (!confirm(`Delete audio for ${selectedIds.size} Pokémon?`)) return;
+
+    setIsDeleting(true);
+    try {
+      await onDeleteAudio(Array.from(selectedIds) as number[]);
+      setSelectedIds(new Set());
+      onRefresh();
+    } catch (e) {
+      console.error('Failed to delete audio:', e);
+      alert('Failed to delete audio. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteBoth = async () => {
+    if (!onDeleteSummaries || !onDeleteAudio || selectedIds.size === 0) return;
+    if (!confirm(`Delete both text and audio for ${selectedIds.size} Pokémon?`)) return;
+
+    setIsDeleting(true);
+    try {
+      const ids = Array.from(selectedIds) as number[];
+      await Promise.all([onDeleteSummaries(ids), onDeleteAudio(ids)]);
+      setSelectedIds(new Set());
+      onRefresh();
+    } catch (e) {
+      console.error('Failed to delete:', e);
+      alert('Failed to delete. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-6">
       {/* Compact Header */}
@@ -233,14 +353,49 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({ summarie
             {entries.length} entries • {selectedIds.size} selected
           </p>
         </div>
-        <button
-          onClick={handleDownload}
-          disabled={selectedIds.size === 0}
-          className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Download className="h-4 w-4" />
-          Download
-        </button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && onDeleteSummaries && (
+            <button
+              onClick={handleDeleteSummaries}
+              disabled={isDeleting}
+              className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Text
+            </button>
+          )}
+          {selectedIds.size > 0 && onDeleteAudio && (
+            <button
+              onClick={handleDeleteAudio}
+              disabled={isDeleting}
+              className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ borderColor: '#d97706', color: '#d97706' }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Audio
+            </button>
+          )}
+          {selectedIds.size > 0 && onDeleteSummaries && onDeleteAudio && (
+            <button
+              onClick={handleDeleteBoth}
+              disabled={isDeleting}
+              className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
+              style={{ borderColor: 'var(--text-tertiary)', color: 'var(--text-tertiary)' }}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Both
+            </button>
+          )}
+          <button
+            onClick={handleDownload}
+            disabled={selectedIds.size === 0}
+            className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            Download
+          </button>
+        </div>
       </div>
 
       {/* Compact Filters Grid */}
@@ -405,40 +560,55 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({ summarie
           const isSelected = selectedIds.has(entry.id);
           const hasText = !!entry.summary;
           const hasAudio = !!entry.audio;
+          const cachedImage = pokemonImages.get(entry.id);
+          const imageSrc = cachedImage?.imagePngPath || cachedImage?.imageSvgPath;
 
           return (
             <div
               key={entry.id}
-              className={`relative overflow-hidden rounded-2xl border-4 transition-all ${
-                isSelected
-                  ? 'border-volcanic-500 bg-volcanic-50 shadow-xl'
-                  : 'border-earth-200 bg-white shadow-lg hover:shadow-xl'
-              }`}
+              className="relative overflow-hidden rounded-2xl border-2 shadow-lg transition-all hover:shadow-xl"
+              style={{
+                background: 'var(--surface-card)',
+                borderColor: isSelected ? 'var(--accent-primary)' : 'var(--border-primary)',
+              }}
             >
               <button
                 onClick={() => toggleSelect(entry.id)}
-                className={`absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all ${
-                  isSelected
-                    ? 'border-volcanic-600 bg-volcanic-600 text-white'
-                    : 'border-earth-300 text-earth-600 hover:border-volcanic-400 bg-white'
-                }`}
+                className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all"
+                style={{
+                  background: isSelected ? 'var(--accent-primary)' : 'var(--surface-card)',
+                  borderColor: isSelected ? 'var(--accent-primary)' : 'var(--border-secondary)',
+                  color: isSelected ? 'var(--text-inverse)' : 'var(--text-tertiary)',
+                }}
               >
                 {isSelected && <Check className="h-5 w-5" />}
               </button>
 
-              <div className="via-forest-50 to-sunlight-100 relative h-48 bg-gradient-to-br from-sky-100 p-6">
+              <div className="relative h-48 p-6" style={{ background: 'var(--bg-secondary)' }}>
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
-                  <span className="bg-earth-800 text-earth-50 rounded-full px-3 py-1 text-xs font-bold">
+                  <span
+                    className="rounded-full px-3 py-1 text-xs font-bold"
+                    style={{ background: 'var(--accent-primary)', color: 'var(--text-inverse)' }}
+                  >
                     #{formatPokemonId(entry.id)}
                   </span>
                   {hasText && (
-                    <span className="bg-forest-600 flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold text-white">
+                    <span
+                      className="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold"
+                      style={{
+                        background: 'var(--accent-secondary)',
+                        color: 'var(--text-inverse)',
+                      }}
+                    >
                       <FileText className="h-3 w-3" />
                       Text
                     </span>
                   )}
                   {hasAudio && (
-                    <span className="bg-ocean-600 flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold text-white">
+                    <span
+                      className="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold"
+                      style={{ background: '#d97706', color: 'var(--text-inverse)' }}
+                    >
                       <Volume2 className="h-3 w-3" />
                       Audio
                     </span>
@@ -446,29 +616,47 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({ summarie
                 </div>
 
                 <div className="flex h-full items-center justify-center">
-                  <ImageIcon
-                    className="h-20 w-20"
-                    style={{ color: 'var(--text-tertiary)', opacity: 0.3 }}
-                  />
+                  {imageSrc ? (
+                    <Image
+                      src={imageSrc}
+                      alt={entry.name}
+                      width={96}
+                      height={96}
+                      className="h-24 w-24 object-contain"
+                      unoptimized
+                    />
+                  ) : (
+                    <ImageIcon
+                      className="h-20 w-20"
+                      style={{ color: 'var(--text-tertiary)', opacity: 0.3 }}
+                    />
+                  )}
                 </div>
               </div>
 
-              <div className="p-5">
-                <h3 className="text-ocean-900 mb-1 text-xl font-bold capitalize">{entry.name}</h3>
-                <p className="text-ocean-600 mb-3 text-sm">
+              <div className="p-5" style={{ background: 'var(--surface-card)' }}>
+                <h3
+                  className="mb-1 text-xl font-bold capitalize"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  {entry.name}
+                </h3>
+                <p className="mb-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
                   {entry.region} • Gen {entry.generationId}
                 </p>
 
                 {hasText && (
                   <div className="mb-3">
                     <p
-                      className={`text-earth-800 text-sm leading-relaxed ${isExpanded ? '' : 'line-clamp-3'}`}
+                      className={`text-sm leading-relaxed ${isExpanded ? '' : 'line-clamp-3'}`}
+                      style={{ color: 'var(--text-secondary)' }}
                     >
                       {entry.summary}
                     </p>
                     <button
                       onClick={() => toggleExpand(entry.id)}
-                      className="text-ocean-600 hover:text-ocean-700 mt-2 flex items-center gap-1 text-xs font-semibold"
+                      className="mt-2 flex items-center gap-1 text-xs font-semibold transition-colors"
+                      style={{ color: 'var(--accent-secondary)' }}
                     >
                       {isExpanded ? (
                         <>
@@ -494,9 +682,17 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({ summarie
                 )}
 
                 {!hasText && !hasAudio && (
-                  <div className="bg-earth-50 rounded-lg p-4 text-center">
-                    <Sparkles className="text-earth-400 mx-auto mb-2 h-6 w-6" />
-                    <p className="text-earth-600 text-xs">No data available</p>
+                  <div
+                    className="rounded-lg p-4 text-center"
+                    style={{ background: 'var(--bg-secondary)' }}
+                  >
+                    <Sparkles
+                      className="mx-auto mb-2 h-6 w-6"
+                      style={{ color: 'var(--text-tertiary)' }}
+                    />
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      No data available
+                    </p>
                   </div>
                 )}
               </div>
@@ -506,10 +702,17 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({ summarie
       </div>
 
       {filteredEntries.length === 0 && (
-        <div className="border-earth-200 rounded-2xl border-4 bg-white p-16 text-center">
-          <Search className="text-earth-300 mx-auto mb-4 h-16 w-16" />
-          <p className="text-earth-600 text-xl font-semibold">No entries found</p>
-          <p className="text-earth-500 mt-2 text-sm">Try adjusting your filters or search query.</p>
+        <div
+          className="rounded-2xl border-2 p-16 text-center"
+          style={{ background: 'var(--surface-card)', borderColor: 'var(--border-primary)' }}
+        >
+          <Search className="mx-auto mb-4 h-16 w-16" style={{ color: 'var(--text-tertiary)' }} />
+          <p className="text-xl font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            No entries found
+          </p>
+          <p className="mt-2 text-sm" style={{ color: 'var(--text-tertiary)' }}>
+            Try adjusting your filters or search query.
+          </p>
         </div>
       )}
     </div>

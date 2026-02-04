@@ -219,3 +219,33 @@ export const deleteAudioLog = async (id: number): Promise<void> => {
     throw new Error('Failed to delete audio log');
   }
 };
+
+/**
+ * Delete multiple summaries by Pokémon ids.
+ */
+export const deleteSummaries = async (ids: number[]): Promise<void> => {
+  const response = await fetch(`${API_BASE}/summaries`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete summaries');
+  }
+};
+
+/**
+ * Delete multiple audio logs by Pokémon ids.
+ */
+export const deleteAudioLogs = async (ids: number[]): Promise<void> => {
+  const response = await fetch(`${API_BASE}/audio`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete audio logs');
+  }
+};

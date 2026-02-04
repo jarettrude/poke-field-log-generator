@@ -1,6 +1,7 @@
 import React from 'react';
-import { Home, BookOpen, Settings, BookMarked } from 'lucide-react';
+import { Home, BookOpen, Settings, BookMarked, Sun, Moon, Monitor } from 'lucide-react';
 import { AppView } from '../types';
+import { useTheme } from './ThemeProvider';
 
 interface HeaderProps {
   onNavigate: (view: AppView) => void;
@@ -8,6 +9,20 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
+  const { theme, setTheme } = useTheme();
+
+  const cycleTheme = () => {
+    const themes: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system'];
+    const currentIndex = themes.indexOf(theme);
+    const nextIndex = (currentIndex + 1) % themes.length;
+    const nextTheme = themes[nextIndex];
+    if (nextTheme) {
+      setTheme(nextTheme);
+    }
+  };
+
+  const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;
+
   return (
     <header
       className="border-b-2 shadow-md"
@@ -19,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
             className="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg"
             style={{ background: 'var(--accent-primary)' }}
           >
-            <BookMarked className="h-6 w-6 text-white" />
+            <BookMarked className="h-6 w-6" style={{ color: 'var(--text-inverse)' }} />
           </div>
           <div>
             <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
@@ -31,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
           </div>
         </div>
 
-        <nav className="flex gap-2">
+        <nav className="flex items-center gap-2">
           <button
             onClick={() => onNavigate(AppView.HOME)}
             className={currentView === AppView.HOME ? 'btn btn-primary' : 'btn btn-ghost'}
@@ -54,6 +69,12 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
           >
             <Settings className="h-4 w-4" />
             Settings
+          </button>
+
+          <div className="mx-2 h-6 w-px" style={{ background: 'var(--border-secondary)' }} />
+
+          <button onClick={cycleTheme} className="btn btn-ghost" title={`Theme: ${theme}`}>
+            <ThemeIcon className="h-4 w-4" />
           </button>
         </nav>
       </div>

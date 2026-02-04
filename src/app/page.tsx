@@ -15,6 +15,8 @@ import {
   getAllAudioLogs,
   getAudioLogsByGeneration,
   StoredAudioLog,
+  deleteSummaries,
+  deleteAudioLogs,
 } from '@/services/storageService';
 
 import {
@@ -27,6 +29,7 @@ import {
   ResultsView,
   ToastProvider,
   useToast,
+  ThemeProvider,
 } from '@/components';
 
 import {
@@ -373,6 +376,7 @@ function HomeInner() {
             onSearchChange={setSearchQuery}
             isLoading={isLoading}
             savedSummaries={savedSummaries}
+            savedAudioLogs={savedAudioLogs}
           />
         )}
 
@@ -383,6 +387,12 @@ function HomeInner() {
             onRefresh={async () => {
               await loadSavedSummaries();
               await loadSavedAudioLogs();
+            }}
+            onDeleteSummaries={async (ids: number[]) => {
+              await deleteSummaries(ids);
+            }}
+            onDeleteAudio={async (ids: number[]) => {
+              await deleteAudioLogs(ids);
             }}
           />
         )}
@@ -424,8 +434,10 @@ function HomeInner() {
 
 export default function Home() {
   return (
-    <ToastProvider>
-      <HomeInner />
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <HomeInner />
+      </ToastProvider>
+    </ThemeProvider>
   );
 }

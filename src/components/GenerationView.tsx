@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
+import { Volume2 } from 'lucide-react';
 import { Generation, PokemonBaseInfo, WorkflowMode } from '../types';
-import { StoredSummary } from '../services/storageService';
+import { StoredSummary, StoredAudioLog } from '../services/storageService';
 import { VOICE_OPTIONS } from '../constants';
 import { formatPokemonId } from '../utils/pokemonUtils';
 
@@ -22,6 +23,7 @@ interface GenerationViewProps {
   onSearchChange: (query: string) => void;
   isLoading: boolean;
   savedSummaries: StoredSummary[];
+  savedAudioLogs: StoredAudioLog[];
 }
 
 export const GenerationView: React.FC<GenerationViewProps> = ({
@@ -42,6 +44,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
   onSearchChange,
   isLoading,
   savedSummaries,
+  savedAudioLogs,
 }) => {
   const filteredPokemon = useMemo(() => {
     let list = pokemonList;
@@ -55,7 +58,8 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
     return list;
   }, [pokemonList, searchQuery]);
 
-  const savedIds = new Set(savedSummaries.map(s => s.id));
+  const savedSummaryIds = new Set(savedSummaries.map(s => s.id));
+  const savedAudioIds = new Set(savedAudioLogs.map(a => a.id));
 
   const getModeLabel = () => {
     switch (mode) {
@@ -68,29 +72,24 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
     }
   };
 
-  const getModeColor = () => {
-    switch (mode) {
-      case WorkflowMode.FULL:
-        return 'bg-pokeball-600 hover:bg-pokeball-700';
-      case WorkflowMode.SUMMARY_ONLY:
-        return 'bg-emerald-600 hover:bg-emerald-700';
-      case WorkflowMode.AUDIO_ONLY:
-        return 'bg-amber-600 hover:bg-amber-700';
-    }
-  };
-
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      <div className="mb-8 rounded-xl border border-amber-100/80 bg-white p-8 shadow-sm">
+      <div
+        className="mb-8 rounded-xl border-2 p-8 shadow-sm"
+        style={{ background: 'var(--surface-card)', borderColor: 'var(--border-primary)' }}
+      >
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
-            <label className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+            <label
+              className="text-xs font-semibold tracking-wide uppercase"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
               Region Era
             </label>
             <select
               value={selectedGenId}
               onChange={e => onGenChange(Number(e.target.value))}
-              className="focus:border-pokeball-300 focus:ring-pokeball-100 h-14 w-full rounded-lg border border-amber-100 bg-white px-4 font-medium text-slate-800 transition-colors outline-none hover:border-amber-200 focus:ring-1"
+              className="select h-14"
             >
               {generations.map(g => (
                 <option key={g.id} value={g.id}>
@@ -102,13 +101,16 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
 
           {mode !== WorkflowMode.SUMMARY_ONLY && (
             <div className="space-y-2">
-              <label className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+              <label
+                className="text-xs font-semibold tracking-wide uppercase"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
                 Voice Profile
               </label>
               <select
                 value={selectedVoice}
                 onChange={e => onVoiceChange(e.target.value)}
-                className="focus:border-pokeball-300 focus:ring-pokeball-100 h-14 w-full rounded-lg border border-amber-100 bg-white px-4 font-medium text-slate-800 transition-colors outline-none hover:border-amber-200 focus:ring-1"
+                className="select h-14"
               >
                 {VOICE_OPTIONS.map(v => (
                   <option key={v.id} value={v.id}>
@@ -120,7 +122,10 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
           )}
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+            <label
+              className="text-xs font-semibold tracking-wide uppercase"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
               Start ID
             </label>
             <input
@@ -128,12 +133,15 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
               value={rangeStart}
               onChange={e => onRangeChange(parseInt(e.target.value) || 1, rangeEnd)}
               disabled={selectedIds.size > 0}
-              className="h-14 w-full rounded-lg border border-amber-100 bg-white px-4 font-medium text-slate-700 disabled:opacity-50"
+              className="input h-14 disabled:opacity-50"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+            <label
+              className="text-xs font-semibold tracking-wide uppercase"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
               End ID
             </label>
             <input
@@ -141,42 +149,50 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
               value={rangeEnd}
               onChange={e => onRangeChange(rangeStart, parseInt(e.target.value) || 1)}
               disabled={selectedIds.size > 0}
-              className="h-14 w-full rounded-lg border border-amber-100 bg-white px-4 font-medium text-slate-700 disabled:opacity-50"
+              className="input h-14 disabled:opacity-50"
             />
           </div>
         </div>
 
         <div className="flex flex-col items-end gap-4 md:flex-row">
           <div className="flex-1 space-y-2">
-            <label className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
+            <label
+              className="text-xs font-semibold tracking-wide uppercase"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
               Search
             </label>
             <input
               type="text"
               value={searchQuery}
               onChange={e => onSearchChange(e.target.value)}
-              className="focus:border-pokeball-300 focus:ring-pokeball-100 h-14 w-full rounded-lg border border-amber-100 bg-white px-5 font-medium outline-none focus:ring-1"
+              className="input h-14"
               placeholder="Find by name or ID..."
             />
           </div>
 
-          <button
-            onClick={onStartProcess}
-            className={`h-14 rounded-lg px-8 font-semibold text-white shadow-sm transition-all hover:shadow ${getModeColor()}`}
-          >
+          <button onClick={onStartProcess} className="btn btn-primary h-14 px-8">
             {selectedIds.size > 0 ? `${getModeLabel()} (${selectedIds.size})` : getModeLabel()}
           </button>
         </div>
 
         {selectedIds.size > 0 && (
-          <div className="mt-6 rounded-lg border border-rose-100 bg-rose-50/50 p-4">
+          <div
+            className="mt-6 rounded-lg border-2 p-4"
+            style={{
+              background: 'var(--bg-secondary)',
+              borderColor: 'var(--accent-primary)',
+              opacity: 0.9,
+            }}
+          >
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-semibold text-rose-600">
+              <span className="text-xs font-semibold" style={{ color: 'var(--accent-primary)' }}>
                 {selectedIds.size} selected
               </span>
               <button
                 onClick={() => selectedIds.forEach(id => onToggleSelection(id))}
-                className="text-xs font-medium text-rose-400 hover:text-rose-600"
+                className="text-xs font-medium transition-colors"
+                style={{ color: 'var(--text-tertiary)' }}
               >
                 Clear All
               </button>
@@ -188,7 +204,8 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
                   <span
                     key={id}
                     onClick={() => onToggleSelection(id)}
-                    className="cursor-pointer rounded bg-white px-2.5 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-rose-100 hover:text-rose-700"
+                    className="cursor-pointer rounded px-2.5 py-1 text-xs font-medium shadow-sm transition-colors"
+                    style={{ background: 'var(--surface-card)', color: 'var(--text-secondary)' }}
                   >
                     #{id}
                   </span>
@@ -204,35 +221,47 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
           ? Array.from({ length: 24 }).map((_, i) => (
               <div
                 key={i}
-                className="h-20 animate-pulse rounded-lg border border-slate-100 bg-slate-50"
+                className="h-20 animate-pulse rounded-lg border-2"
+                style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
               />
             ))
           : filteredPokemon.map(p => {
               const isSelected = selectedIds.has(p.id);
-              const hasSavedSummary = savedIds.has(p.id);
+              const hasSavedSummary = savedSummaryIds.has(p.id);
+              const hasSavedAudio = savedAudioIds.has(p.id);
               return (
                 <div
                   key={p.id}
                   onClick={() => onToggleSelection(p.id)}
-                  className={`group relative cursor-pointer rounded-lg border bg-white p-3.5 transition-all ${
-                    isSelected
-                      ? 'border-rose-500 bg-rose-50/30 shadow-sm'
-                      : 'border-slate-150 hover:border-slate-300 hover:shadow-md'
-                  }`}
+                  className="group relative cursor-pointer rounded-lg border-2 p-3.5 transition-all hover:shadow-md"
+                  style={{
+                    background: isSelected ? 'var(--bg-secondary)' : 'var(--surface-card)',
+                    borderColor: isSelected ? 'var(--accent-primary)' : 'var(--border-primary)',
+                  }}
                 >
-                  {hasSavedSummary && (
-                    <div
-                      className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-emerald-500"
-                      title="Summary saved"
-                    />
-                  )}
+                  <div className="absolute top-2 right-2 flex gap-1">
+                    {hasSavedSummary && (
+                      <div
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: 'var(--accent-secondary)' }}
+                        title="Summary saved"
+                      />
+                    )}
+                    {hasSavedAudio && (
+                      <span title="Audio saved">
+                        <Volume2 className="h-3 w-3" style={{ color: '#d97706' }} />
+                      </span>
+                    )}
+                  </div>
                   <span
-                    className={`text-[9px] font-semibold tracking-wide ${isSelected ? 'text-rose-500' : 'text-slate-300'}`}
+                    className="text-[9px] font-semibold tracking-wide"
+                    style={{ color: isSelected ? 'var(--accent-primary)' : 'var(--text-tertiary)' }}
                   >
                     #{formatPokemonId(p.id)}
                   </span>
                   <h4
-                    className={`mt-1 truncate text-xs font-medium capitalize ${isSelected ? 'text-slate-800' : 'text-slate-500'}`}
+                    className="mt-1 truncate text-xs font-medium capitalize"
+                    style={{ color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)' }}
                   >
                     {p.name}
                   </h4>

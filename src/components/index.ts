@@ -7,3 +7,4 @@ export { AdminView } from './AdminView';
 export { ProcessingOverlay } from './ProcessingOverlay';
 export { ResultsView } from './ResultsView';
 export { ToastProvider, useToast } from './ToastProvider';
+export { ThemeProvider, useTheme } from './ThemeProvider';

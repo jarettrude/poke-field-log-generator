@@ -15,8 +15,8 @@
  *   - Max ~100 TTS batches per day = ~1,500 Pokémon with audio
  */
 
-export const SERVER_TTS_BATCH_SIZE = 10;
-export const SERVER_TTS_MAX_CHARS = 24000;
+export const SERVER_TTS_BATCH_SIZE = 5;
+export const SERVER_TTS_MAX_CHARS = 12000;
 
 export const SERVER_SUMMARY_COOLDOWN_MS = 15000;
 export const SERVER_TTS_COOLDOWN_MS = 300000;
