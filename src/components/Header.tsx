@@ -1,15 +1,14 @@
+'use client';
+
 import React from 'react';
-import { Home, BookOpen, Settings, BookMarked, Sun, Moon, Monitor } from 'lucide-react';
-import { AppView } from '../types';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Home, BookOpen, Settings, BookMarked, Sun, Moon, Monitor, Wand2 } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 
-interface HeaderProps {
-  onNavigate: (view: AppView) => void;
-  currentView: AppView;
-}
-
-export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
+export const Header: React.FC = () => {
   const { theme, setTheme } = useTheme();
+  const pathname = usePathname();
 
   const cycleTheme = () => {
     const themes: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system'];
@@ -23,13 +22,20 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
 
   const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;
 
+  const navItems = [
+    { href: '/', label: 'Home', icon: Home },
+    { href: '/generator', label: 'Generator', icon: Wand2 },
+    { href: '/library', label: 'Pokédex', icon: BookOpen },
+    { href: '/admin', label: 'Settings', icon: Settings },
+  ];
+
   return (
     <header
       className="border-b-2 shadow-md"
       style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-elevated)' }}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3">
           <div
             className="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg"
             style={{ background: 'var(--accent-primary)' }}
@@ -44,32 +50,22 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
               Pokédex Research System
             </p>
           </div>
-        </div>
+        </Link>
 
         <nav className="flex items-center gap-2">
-          <button
-            onClick={() => onNavigate(AppView.HOME)}
-            className={currentView === AppView.HOME ? 'btn btn-primary' : 'btn btn-ghost'}
-          >
-            <Home className="h-4 w-4" />
-            Home
-          </button>
-          <button
-            onClick={() => onNavigate(AppView.POKEDEX_LIBRARY)}
-            className={
-              currentView === AppView.POKEDEX_LIBRARY ? 'btn btn-primary' : 'btn btn-ghost'
-            }
-          >
-            <BookOpen className="h-4 w-4" />
-            Pokédex
-          </button>
-          <button
-            onClick={() => onNavigate(AppView.ADMIN)}
-            className={currentView === AppView.ADMIN ? 'btn btn-primary' : 'btn btn-ghost'}
-          >
-            <Settings className="h-4 w-4" />
-            Settings
-          </button>
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const isActive = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={isActive ? 'btn btn-primary' : 'btn btn-ghost'}
+              >
+                <Icon className="h-4 w-4" />
+                {label}
+              </Link>
+            );
+          })}
 
           <div className="mx-2 h-6 w-px" style={{ background: 'var(--border-secondary)' }} />
 

@@ -10,6 +10,7 @@ import {
   SummaryInput,
   PokemonInput,
   StoredAudioLog,
+  AudioLogMetadata,
   AudioLogInput,
   StoredPrompt,
   PromptInput,
@@ -58,7 +59,15 @@ export class MySQLAdapter implements DatabaseAdapter {
     throw new Error('Not implemented');
   }
 
+  async getAllAudioLogsMetadata(): Promise<AudioLogMetadata[]> {
+    throw new Error('Not implemented');
+  }
+
   async getAudioLogsByGeneration(_genId: number): Promise<StoredAudioLog[]> {
+    throw new Error('Not implemented');
+  }
+
+  async getAudioLogsMetadataByGeneration(_genId: number): Promise<AudioLogMetadata[]> {
     throw new Error('Not implemented');
   }
 

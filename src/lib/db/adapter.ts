@@ -26,6 +26,9 @@ export interface StoredAudioLog {
   updatedAt: string;
 }
 
+// Metadata-only version (excludes large audioBase64 field for list endpoints)
+export type AudioLogMetadata = Omit<StoredAudioLog, 'audioBase64'>;
+
 export interface CachedPokemon {
   id: number;
   name: string;
@@ -128,7 +131,9 @@ export interface DatabaseAdapter {
   saveAudioLog(audioLog: AudioLogInput): Promise<void>;
   getAudioLog(id: number): Promise<StoredAudioLog | null>;
   getAllAudioLogs(): Promise<StoredAudioLog[]>;
+  getAllAudioLogsMetadata(): Promise<AudioLogMetadata[]>;
   getAudioLogsByGeneration(genId: number): Promise<StoredAudioLog[]>;
+  getAudioLogsMetadataByGeneration(genId: number): Promise<AudioLogMetadata[]>;
   deleteAudioLog(id: number): Promise<void>;
 
   // Pokemon cache operations

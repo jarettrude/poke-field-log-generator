@@ -1,133 +1,86 @@
-import React, { useState } from 'react';
-import { Sparkles, FileText, Mic } from 'lucide-react';
-import { WorkflowMode } from '../types';
+import React from 'react';
+import Link from 'next/link';
+import { Wand2, BookOpen, ArrowRight } from 'lucide-react';
 
 interface HomeViewProps {
-  onSelectMode: (mode: WorkflowMode) => void;
   summaryCount: number;
   audioCount: number;
 }
 
-export const HomeView: React.FC<HomeViewProps> = ({ onSelectMode, summaryCount, audioCount }) => {
-  const [hoveredMode, setHoveredMode] = useState<WorkflowMode | null>(null);
-
+export const HomeView: React.FC<HomeViewProps> = ({ summaryCount, audioCount }) => {
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <h2 className="mb-3 text-center text-4xl font-bold" style={{ color: 'var(--text-primary)' }}>
-        Select Pipeline Mode
+        Pokédex Field Logs
       </h2>
       <p
         className="mx-auto mb-12 max-w-2xl text-center text-base leading-relaxed"
         style={{ color: 'var(--text-secondary)' }}
       >
-        Generate field researcher logs with AI-powered text and speech synthesis.
+        Generate immersive field researcher logs with AI-powered text and speech synthesis.
       </p>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <button
-          onClick={() => onSelectMode(WorkflowMode.FULL)}
-          onMouseEnter={() => setHoveredMode(WorkflowMode.FULL)}
-          onMouseLeave={() => setHoveredMode(null)}
-          className="card group p-8 text-left"
-          style={{
-            borderWidth: '3px',
-            borderColor:
-              hoveredMode === WorkflowMode.FULL ? 'var(--accent-primary)' : 'var(--border-primary)',
-          }}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <Link
+          href="/generator"
+          className="card group p-8 text-left transition-all hover:shadow-xl"
+          style={{ borderWidth: '3px', borderColor: 'var(--border-primary)' }}
         >
           <div
-            className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl shadow-lg transition-colors"
-            style={{
-              background:
-                hoveredMode === WorkflowMode.FULL ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-              color:
-                hoveredMode === WorkflowMode.FULL ? 'var(--text-inverse)' : 'var(--accent-primary)',
-            }}
+            className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl shadow-lg transition-colors group-hover:scale-105"
+            style={{ background: 'var(--accent-primary)', color: 'var(--text-inverse)' }}
           >
-            <Sparkles className="h-7 w-7" />
+            <Wand2 className="h-7 w-7" />
           </div>
           <h3 className="mb-2 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Full Pipeline
+            Generate New Logs
           </h3>
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            Generate summaries and audio together. Best for small batches.
+          <p className="mb-4 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            Create summaries and audio for Pokémon. Choose full pipeline, text-only, or audio-only modes.
           </p>
-        </button>
+          <span
+            className="inline-flex items-center gap-2 text-sm font-semibold"
+            style={{ color: 'var(--accent-primary)' }}
+          >
+            Start generating <ArrowRight className="h-4 w-4" />
+          </span>
+        </Link>
 
-        <button
-          onClick={() => onSelectMode(WorkflowMode.SUMMARY_ONLY)}
-          onMouseEnter={() => setHoveredMode(WorkflowMode.SUMMARY_ONLY)}
-          onMouseLeave={() => setHoveredMode(null)}
-          className="card group p-8 text-left"
-          style={{
-            borderWidth: '3px',
-            borderColor:
-              hoveredMode === WorkflowMode.SUMMARY_ONLY
-                ? 'var(--accent-secondary)'
-                : 'var(--border-primary)',
-          }}
+        <Link
+          href="/library"
+          className="card group relative p-8 text-left transition-all hover:shadow-xl"
+          style={{ borderWidth: '3px', borderColor: 'var(--border-primary)' }}
         >
           <div
-            className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl shadow-lg transition-colors"
-            style={{
-              background:
-                hoveredMode === WorkflowMode.SUMMARY_ONLY
-                  ? 'var(--accent-secondary)'
-                  : 'var(--bg-secondary)',
-              color:
-                hoveredMode === WorkflowMode.SUMMARY_ONLY
-                  ? 'var(--text-inverse)'
-                  : 'var(--accent-secondary)',
-            }}
+            className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl shadow-lg transition-colors group-hover:scale-105"
+            style={{ background: 'var(--accent-secondary)', color: 'var(--text-inverse)' }}
           >
-            <FileText className="h-7 w-7" />
+            <BookOpen className="h-7 w-7" />
           </div>
           <h3 className="mb-2 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Text Only
+            View Library
           </h3>
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            Generate and save summaries. Review before synthesizing audio.
+          <p className="mb-4 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            Browse, play, and download your saved field logs. Manage your Pokédex collection.
           </p>
-        </button>
+          <span
+            className="inline-flex items-center gap-2 text-sm font-semibold"
+            style={{ color: 'var(--accent-secondary)' }}
+          >
+            Open library <ArrowRight className="h-4 w-4" />
+          </span>
 
-        <button
-          onClick={() => onSelectMode(WorkflowMode.AUDIO_ONLY)}
-          onMouseEnter={() => setHoveredMode(WorkflowMode.AUDIO_ONLY)}
-          onMouseLeave={() => setHoveredMode(null)}
-          className="card group relative p-8 text-left"
-          style={{
-            borderWidth: '3px',
-            borderColor:
-              hoveredMode === WorkflowMode.AUDIO_ONLY ? '#d97706' : 'var(--border-primary)',
-          }}
-        >
-          <div
-            className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl shadow-lg transition-colors"
-            style={{
-              background:
-                hoveredMode === WorkflowMode.AUDIO_ONLY ? '#d97706' : 'var(--bg-secondary)',
-              color: hoveredMode === WorkflowMode.AUDIO_ONLY ? 'var(--text-inverse)' : '#d97706',
-            }}
-          >
-            <Mic className="h-7 w-7" />
-          </div>
-          <h3 className="mb-2 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Audio Only
-          </h3>
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            Synthesize speech from saved summaries in your library.
-          </p>
-          {summaryCount > 0 && (
-            <span className="badge badge-secondary absolute top-6 right-6 shadow-md">
-              {summaryCount} ready
-            </span>
+          {(summaryCount > 0 || audioCount > 0) && (
+            <div className="absolute top-6 right-6 flex flex-col gap-2">
+              {summaryCount > 0 && (
+                <span className="badge badge-secondary shadow-md">{summaryCount} summaries</span>
+              )}
+              {audioCount > 0 && (
+                <span className="badge badge-neutral shadow-md">{audioCount} audio</span>
+              )}
+            </div>
           )}
-          {audioCount > 0 && (
-            <span className="badge badge-neutral absolute top-16 right-6 shadow-md">
-              {audioCount} saved
-            </span>
-          )}
-        </button>
+        </Link>
       </div>
     </div>
   );

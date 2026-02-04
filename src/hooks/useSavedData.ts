@@ -3,12 +3,12 @@ import {
   getAllSummaries,
   getAllAudioLogs,
   StoredSummary,
-  StoredAudioLog,
+  AudioLogMetadata,
 } from '@/services/storageService';
 
 export function useSavedData() {
   const [savedSummaries, setSavedSummaries] = useState<StoredSummary[]>([]);
-  const [savedAudioLogs, setSavedAudioLogs] = useState<StoredAudioLog[]>([]);
+  const [savedAudioLogs, setSavedAudioLogs] = useState<AudioLogMetadata[]>([]);
 
   const refreshData = useCallback(async () => {
     try {

@@ -1,12 +1,13 @@
 import React, { useMemo } from 'react';
-import { Volume2 } from 'lucide-react';
+import { Volume2, FileText, Wand2, Mic } from 'lucide-react';
 import { Generation, PokemonBaseInfo, WorkflowMode } from '../types';
-import { StoredSummary, StoredAudioLog } from '../services/storageService';
+import { StoredSummary, AudioLogMetadata } from '../services/storageService';
 import { VOICE_OPTIONS } from '../constants';
 import { formatPokemonId } from '../utils/pokemonUtils';
 
 interface GenerationViewProps {
   mode: WorkflowMode;
+  onModeChange?: (mode: WorkflowMode) => void;
   generations: Generation[];
   selectedGenId: number;
   onGenChange: (genId: number) => void;
@@ -23,11 +24,12 @@ interface GenerationViewProps {
   onSearchChange: (query: string) => void;
   isLoading: boolean;
   savedSummaries: StoredSummary[];
-  savedAudioLogs: StoredAudioLog[];
+  savedAudioLogs: AudioLogMetadata[];
 }
 
 export const GenerationView: React.FC<GenerationViewProps> = ({
   mode,
+  onModeChange,
   generations,
   selectedGenId,
   onGenChange,
@@ -72,8 +74,38 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
     }
   };
 
+  const modeOptions = [
+    { value: WorkflowMode.FULL, label: 'Full Logs', icon: Wand2, desc: 'Summary + Audio' },
+    { value: WorkflowMode.SUMMARY_ONLY, label: 'Summaries', icon: FileText, desc: 'Text only' },
+    { value: WorkflowMode.AUDIO_ONLY, label: 'Audio', icon: Mic, desc: 'From saved summaries' },
+  ];
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
+      {/* Mode Selection */}
+      {onModeChange && (
+        <div className="mb-6 flex flex-wrap justify-center gap-3">
+          {modeOptions.map(({ value, label, icon: Icon, desc }) => (
+            <button
+              key={value}
+              onClick={() => onModeChange(value)}
+              className="flex items-center gap-3 rounded-xl border-2 px-5 py-3 transition-all"
+              style={{
+                background: mode === value ? 'var(--accent-primary)' : 'var(--surface-card)',
+                borderColor: mode === value ? 'var(--accent-primary)' : 'var(--border-primary)',
+                color: mode === value ? 'var(--text-inverse)' : 'var(--text-primary)',
+              }}
+            >
+              <Icon className="h-5 w-5" />
+              <div className="text-left">
+                <div className="font-semibold">{label}</div>
+                <div className="text-xs opacity-75">{desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div
         className="mb-8 rounded-xl border-2 p-8 shadow-sm"
         style={{ background: 'var(--surface-card)', borderColor: 'var(--border-primary)' }}

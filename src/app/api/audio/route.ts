@@ -3,7 +3,8 @@ import { successResponse, errorResponse } from '@/lib/server/api';
 
 export const runtime = 'nodejs';
 
-// GET /api/audio - Get all audio logs (optionally filter by generationId)
+// GET /api/audio - Get all audio logs metadata (optionally filter by generationId)
+// Returns metadata only (no audioBase64) to prevent RangeError on large datasets
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -11,9 +12,10 @@ export async function GET(request: Request) {
 
     const db = await getDatabase();
 
+    // Use metadata-only methods to avoid JSON serialization issues with large audio data
     const audioLogs = generationIdParam
-      ? await db.getAudioLogsByGeneration(parseInt(generationIdParam))
-      : await db.getAllAudioLogs();
+      ? await db.getAudioLogsMetadataByGeneration(parseInt(generationIdParam))
+      : await db.getAllAudioLogsMetadata();
 
     return successResponse(audioLogs);
   } catch (error) {

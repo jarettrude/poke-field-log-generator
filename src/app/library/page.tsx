@@ -1,24 +1,34 @@
 'use client';
 
+import { deleteSummaries, deleteAudioLogs } from '@/services/storageService';
 import {
   Header,
-  HomeView,
+  PokedexLibraryView,
   ToastProvider,
   ThemeProvider,
 } from '@/components';
 import { useSavedData } from '@/hooks/useSavedData';
 
-function HomePageInner() {
-  const { savedSummaries, savedAudioLogs } = useSavedData();
+function LibraryPageInner() {
+  const { savedSummaries, savedAudioLogs, refreshData } = useSavedData();
 
   return (
     <div className="min-h-screen bg-transparent">
       <Header />
 
       <main className="pb-20">
-        <HomeView
-          summaryCount={savedSummaries.length}
-          audioCount={savedAudioLogs.length}
+        <PokedexLibraryView
+          summaries={savedSummaries}
+          audioLogs={savedAudioLogs}
+          onRefresh={refreshData}
+          onDeleteSummaries={async (ids: number[]) => {
+            await deleteSummaries(ids);
+            await refreshData();
+          }}
+          onDeleteAudio={async (ids: number[]) => {
+            await deleteAudioLogs(ids);
+            await refreshData();
+          }}
         />
       </main>
 
@@ -34,11 +44,11 @@ function HomePageInner() {
   );
 }
 
-export default function HomePage() {
+export default function LibraryPage() {
   return (
     <ThemeProvider>
       <ToastProvider>
-        <HomePageInner />
+        <LibraryPageInner />
       </ToastProvider>
     </ThemeProvider>
   );

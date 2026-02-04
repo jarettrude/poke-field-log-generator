@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { getJob } from '@/services/jobsService';
 import { useToast } from '@/components/ToastProvider';
-import { getSummariesByGeneration, getAudioLogsByGeneration } from '@/services/storageService';
+import { getSummariesByGeneration, getAudioLogsByGeneration, getAudioLog } from '@/services/storageService';
 import { ProcessedPokemon, CooldownState } from '@/types';
 
 interface UseJobPollingProps {
@@ -42,19 +42,23 @@ export function useJobPolling({
     generationId: number;
     pokemonIds: number[];
   }): Promise<ProcessedPokemon[]> => {
-    const [summaries, audioLogs] = await Promise.all([
+    const [summaries, audioLogsMeta] = await Promise.all([
       getSummariesByGeneration(job.generationId),
       getAudioLogsByGeneration(job.generationId),
     ]);
 
     const summaryById = new Map(summaries.map(s => [s.id, s] as const));
-    const audioById = new Map(audioLogs.map(a => [a.id, a] as const));
+    const audioMetaIds = new Set(audioLogsMeta.map(a => a.id));
 
     const results: ProcessedPokemon[] = [];
     for (const id of job.pokemonIds) {
       const summary = summaryById.get(id);
-      const audio = audioById.get(id);
-      if (!summary || !audio) continue;
+      const hasAudio = audioMetaIds.has(id);
+      if (!summary || !hasAudio) continue;
+
+      // Fetch full audio data (with audioBase64) for results
+      const audio = await getAudioLog(id);
+      if (!audio) continue;
 
       const cachedPokemonRes = await fetch(`/api/pokemon/${id}`);
       const response = (await cachedPokemonRes.json().catch(() => null)) as {

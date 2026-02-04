@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import {
   Search,
@@ -12,8 +12,11 @@ import {
   Check,
   ImageIcon,
   Trash2,
+  Play,
+  Pause,
+  Loader2,
 } from 'lucide-react';
-import { StoredSummary, StoredAudioLog } from '../services/storageService';
+import { StoredSummary, AudioLogMetadata, getAudioLog } from '../services/storageService';
 import { formatPokemonId } from '../utils/pokemonUtils';
 import { pcmToWav } from '../services/audioUtils';
 import JSZip from 'jszip';
@@ -24,15 +27,121 @@ interface PokedexEntry {
   region: string;
   generationId: number;
   summary?: string;
-  audio?: {
+  hasAudio: boolean;
+  audioMeta?: {
     voice: string;
-    audioBase64: string;
     audioFormat: 'pcm_s16le' | 'wav';
     sampleRate: number;
   };
   imagePngPath?: string | null;
   imageSvgPath?: string | null;
 }
+
+interface LazyAudioPlayerProps {
+  pokemonId: number;
+  audioMeta: {
+    voice: string;
+    audioFormat: 'pcm_s16le' | 'wav';
+    sampleRate: number;
+  };
+}
+
+const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId, audioMeta }) => {
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const loadAndPlay = useCallback(async () => {
+    if (audioUrl) {
+      // Already loaded, just play
+      audioRef.current?.play();
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const audioLog = await getAudioLog(pokemonId);
+      if (!audioLog) {
+        setError('Audio not found');
+        return;
+      }
+      const wavUrl = pcmToWav(audioLog.audioBase64, audioMeta.sampleRate);
+      setAudioUrl(wavUrl);
+      // Play after state update via useEffect
+    } catch (e) {
+      setError('Failed to load audio');
+      console.error('Failed to load audio:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pokemonId, audioMeta.sampleRate, audioUrl]);
+
+  useEffect(() => {
+    if (audioUrl && audioRef.current) {
+      audioRef.current.play();
+    }
+  }, [audioUrl]);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+        <Volume2 className="h-4 w-4" />
+        {error}
+      </div>
+    );
+  }
+
+  if (!audioUrl) {
+    return (
+      <button
+        onClick={loadAndPlay}
+        disabled={isLoading}
+        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all hover:opacity-80 disabled:opacity-50"
+        style={{ background: 'var(--accent-secondary)', color: 'var(--text-inverse)' }}
+      >
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Play className="h-4 w-4" />
+        )}
+        {isLoading ? 'Loading...' : 'Play Audio'}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={togglePlay}
+        className="flex h-8 w-8 items-center justify-center rounded-full transition-all hover:opacity-80"
+        style={{ background: 'var(--accent-secondary)', color: 'var(--text-inverse)' }}
+      >
+        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+      </button>
+      <audio
+        ref={audioRef}
+        src={audioUrl}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
+        onEnded={() => setIsPlaying(false)}
+        className="h-8 flex-1"
+        controls
+      />
+    </div>
+  );
+};
 
 interface CachedPokemonImage {
   id: number;
@@ -42,7 +151,7 @@ interface CachedPokemonImage {
 
 interface PokedexLibraryViewProps {
   summaries: StoredSummary[];
-  audioLogs: StoredAudioLog[];
+  audioLogs: AudioLogMetadata[];
   onRefresh: () => void;
   onDeleteSummaries?: (ids: number[]) => Promise<void>;
   onDeleteAudio?: (ids: number[]) => Promise<void>;
@@ -128,15 +237,16 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         region: s.region,
         generationId: s.generationId,
         summary: s.summary,
+        hasAudio: false,
       });
     });
 
     audioLogs.forEach(a => {
       const existing = entryMap.get(a.id);
       if (existing) {
-        existing.audio = {
+        existing.hasAudio = true;
+        existing.audioMeta = {
           voice: a.voice,
-          audioBase64: a.audioBase64,
           audioFormat: a.audioFormat,
           sampleRate: a.sampleRate,
         };
@@ -146,9 +256,9 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           name: a.name,
           region: a.region,
           generationId: a.generationId,
-          audio: {
+          hasAudio: true,
+          audioMeta: {
             voice: a.voice,
-            audioBase64: a.audioBase64,
             audioFormat: a.audioFormat,
             sampleRate: a.sampleRate,
           },
@@ -165,8 +275,8 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
       if (regionFilter !== 'all' && entry.region !== regionFilter) return false;
 
       if (contentFilter === 'text' && !entry.summary) return false;
-      if (contentFilter === 'audio' && !entry.audio) return false;
-      if (contentFilter === 'complete' && (!entry.summary || !entry.audio)) return false;
+      if (contentFilter === 'audio' && !entry.hasAudio) return false;
+      if (contentFilter === 'complete' && (!entry.summary || !entry.hasAudio)) return false;
 
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -253,11 +363,18 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         folder.file(`${filePrefix}.txt`, entry.summary);
       }
 
-      if (entry.audio) {
-        const audioBlob = await fetch(
-          pcmToWav(entry.audio.audioBase64, entry.audio.sampleRate)
-        ).then(res => res.blob());
-        folder.file(`${filePrefix}.wav`, audioBlob);
+      if (entry.hasAudio && entry.audioMeta) {
+        try {
+          const audioLog = await getAudioLog(entry.id);
+          if (audioLog) {
+            const audioBlob = await fetch(
+              pcmToWav(audioLog.audioBase64, entry.audioMeta.sampleRate)
+            ).then(res => res.blob());
+            folder.file(`${filePrefix}.wav`, audioBlob);
+          }
+        } catch (e) {
+          console.warn(`Failed to fetch audio for ${entry.name}:`, e);
+        }
       }
 
       try {
@@ -565,7 +682,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           const isExpanded = expandedIds.has(entry.id);
           const isSelected = selectedIds.has(entry.id);
           const hasText = !!entry.summary;
-          const hasAudio = !!entry.audio;
+          const hasAudio = entry.hasAudio;
           const cachedImage = pokemonImages.get(entry.id);
           const imageSrc = cachedImage?.imageSvgPath || cachedImage?.imagePngPath;
 
@@ -677,13 +794,9 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                   </div>
                 )}
 
-                {hasAudio && (
+                {hasAudio && entry.audioMeta && (
                   <div className="mt-3">
-                    <audio
-                      controls
-                      className="w-full"
-                      src={pcmToWav(entry.audio!.audioBase64, entry.audio!.sampleRate)}
-                    />
+                    <LazyAudioPlayer pokemonId={entry.id} audioMeta={entry.audioMeta} />
                   </div>
                 )}
 

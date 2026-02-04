@@ -13,6 +13,7 @@ import {
   ProcessingStage,
   StoredSummary,
   StoredAudioLog,
+  AudioLogMetadata,
   CachedPokemon,
   SummaryInput,
   AudioLogInput,
@@ -235,10 +236,26 @@ export class SQLiteAdapter implements DatabaseAdapter {
     return rows.map(this.mapRowToAudioLog);
   }
 
+  async getAllAudioLogsMetadata(): Promise<AudioLogMetadata[]> {
+    const stmt = this.db!.prepare(
+      'SELECT id, name, region, generation_id, voice, audio_format, sample_rate, created_at, updated_at FROM audio_logs ORDER BY id'
+    );
+    const rows = stmt.all() as DatabaseRow[];
+    return rows.map(this.mapRowToAudioLogMetadata);
+  }
+
   async getAudioLogsByGeneration(genId: number): Promise<StoredAudioLog[]> {
     const stmt = this.db!.prepare('SELECT * FROM audio_logs WHERE generation_id = ? ORDER BY id');
     const rows = stmt.all(genId) as DatabaseRow[];
     return rows.map(this.mapRowToAudioLog);
+  }
+
+  async getAudioLogsMetadataByGeneration(genId: number): Promise<AudioLogMetadata[]> {
+    const stmt = this.db!.prepare(
+      'SELECT id, name, region, generation_id, voice, audio_format, sample_rate, created_at, updated_at FROM audio_logs WHERE generation_id = ? ORDER BY id'
+    );
+    const rows = stmt.all(genId) as DatabaseRow[];
+    return rows.map(this.mapRowToAudioLogMetadata);
   }
 
   async deleteAudioLog(id: number): Promise<void> {
@@ -497,6 +514,20 @@ export class SQLiteAdapter implements DatabaseAdapter {
       generationId: row.generation_id as number,
       voice: row.voice as string,
       audioBase64: row.audio_base64 as string,
+      audioFormat: row.audio_format as StoredAudioLog['audioFormat'],
+      sampleRate: row.sample_rate as number,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+    };
+  }
+
+  private mapRowToAudioLogMetadata(row: DatabaseRow): AudioLogMetadata {
+    return {
+      id: row.id as number,
+      name: row.name as string,
+      region: row.region as string,
+      generationId: row.generation_id as number,
+      voice: row.voice as string,
       audioFormat: row.audio_format as StoredAudioLog['audioFormat'],
       sampleRate: row.sample_rate as number,
       createdAt: row.created_at as string,

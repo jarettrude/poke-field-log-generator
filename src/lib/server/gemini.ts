@@ -14,8 +14,54 @@ const BACKOFF_MAX_MS = 64000;
 const RATE_LIMIT_BASE_MS = 15000;
 const RATE_LIMIT_MAX_MS = 120000;
 
+/**
+ * Check if error is a daily quota exhaustion (not recoverable by retrying).
+ * 
+ * Google API 429 errors include quota violation details:
+ * - Daily limits: "GenerateRequestsPerDayPerProjectPerModel", "per_day", "PerDay"
+ * - Per-minute limits: "PerMinute", "per_minute" (these ARE recoverable with backoff)
+ * 
+ * Daily quota exhaustion should trigger immediate fallback, not retry.
+ */
+function isDailyQuotaExhausted(error: unknown): boolean {
+  if (error instanceof Error) {
+    const msg = error.message;
+    
+    // Check for daily quota identifiers from Google's QuotaFailure details
+    const hasDailyQuotaIndicator = 
+      msg.includes('PerDay') ||                    // "GenerateRequestsPerDayPerProjectPerModel"
+      msg.includes('per_day') ||                   // Alternative format
+      msg.includes('_per_model_per_day') ||        // Full metric name pattern
+      msg.includes('requests_per_day');            // Another variant
+    
+    // "limit: 0" with RESOURCE_EXHAUSTED means quota completely used up
+    const isQuotaCompletelyExhausted = 
+      msg.includes('limit: 0') && msg.includes('RESOURCE_EXHAUSTED');
+    
+    // If it's a per-minute limit, it's NOT daily exhaustion (should retry)
+    const isPerMinuteLimit = 
+      msg.includes('PerMinute') || 
+      msg.includes('per_minute');
+    
+    if (isPerMinuteLimit) {
+      return false; // Per-minute limits are recoverable
+    }
+    
+    return hasDailyQuotaIndicator || isQuotaCompletelyExhausted;
+  }
+  return false;
+}
+
+/**
+ * Check if error is retryable (transient rate limits, server errors).
+ * Daily quota exhaustion is NOT retryable - should fall back instead.
+ */
 function isRetryableError(error: unknown): boolean {
   if (error instanceof Error) {
+    // Daily quota exhaustion should NOT be retried - fall back immediately
+    if (isDailyQuotaExhausted(error)) {
+      return false;
+    }
     const msg = error.message;
     return (
       msg.includes('429') ||
@@ -143,9 +189,11 @@ export async function generateSummary(details: PokemonDetails, region: string): 
 /**
  * Generate TTS audio from text using Gemini. Returns base64-encoded PCM audio.
  * 
- * Strategy: Start with gemini-2.5-pro-preview-tts with full retry/backoff logic.
- * If Pro exhausts all retries, fall back to gemini-2.5-flash-preview-tts.
- * This effectively doubles our TTS API capacity.
+ * Strategy: Start with gemini-2.5-pro-preview-tts with retry/backoff for transient errors.
+ * If Pro hits daily quota exhaustion OR exhausts all retries, fall back to gemini-2.5-flash-preview-tts.
+ * 
+ * Daily quota exhaustion (RPD) is detected and triggers IMMEDIATE fallback (no retries).
+ * Transient rate limits (RPM) will retry with exponential backoff.
  */
 export async function generateTts(params: { text: string; voiceName: string }): Promise<string> {
   const ai = getClient();
@@ -188,8 +236,12 @@ export async function generateTts(params: { text: string; voiceName: string }): 
       MAX_RETRIES_TTS
     );
   } catch (proError) {
+    // Check if it was daily quota exhaustion (immediate fallback) vs retry exhaustion
+    const reason = isDailyQuotaExhausted(proError)
+      ? 'daily quota exhausted - immediate fallback'
+      : 'exhausted all retries';
     console.warn(
-      'gemini-2.5-pro-preview-tts exhausted all retries. Falling back to gemini-2.5-flash-preview-tts...'
+      `gemini-2.5-pro-preview-tts failed (${reason}). Falling back to gemini-2.5-flash-preview-tts...`
     );
     
     return await withRetry(

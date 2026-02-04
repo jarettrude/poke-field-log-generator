@@ -61,6 +61,19 @@ export interface StoredAudioLog {
   updatedAt: string;
 }
 
+/** Audio log metadata (without audioBase64) for list endpoints - prevents RangeError on large datasets */
+export interface AudioLogMetadata {
+  id: number;
+  name: string;
+  region: string;
+  generationId: number;
+  voice: string;
+  audioFormat: 'pcm_s16le' | 'wav';
+  sampleRate: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Input payload for creating/updating an audio log. */
 export interface AudioLogInput {
   id: number;
@@ -181,19 +194,19 @@ export const getAudioLog = async (id: number): Promise<StoredAudioLog | null> =>
 };
 
 /**
- * Get all audio logs for a generation.
+ * Get all audio logs metadata for a generation (no audioBase64 - use getAudioLog for full data).
  */
-export const getAudioLogsByGeneration = async (generationId: number): Promise<StoredAudioLog[]> => {
+export const getAudioLogsByGeneration = async (generationId: number): Promise<AudioLogMetadata[]> => {
   const response = await fetch(`${API_BASE}/audio?generationId=${generationId}`);
-  return handleResponse<StoredAudioLog[]>(response);
+  return handleResponse<AudioLogMetadata[]>(response);
 };
 
 /**
- * Get all stored audio logs.
+ * Get all stored audio logs metadata (no audioBase64 - use getAudioLog for full data).
  */
-export const getAllAudioLogs = async (): Promise<StoredAudioLog[]> => {
+export const getAllAudioLogs = async (): Promise<AudioLogMetadata[]> => {
   const response = await fetch(`${API_BASE}/audio`);
-  return handleResponse<StoredAudioLog[]>(response);
+  return handleResponse<AudioLogMetadata[]>(response);
 };
 
 /**

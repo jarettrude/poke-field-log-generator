@@ -2,24 +2,18 @@
 
 import {
   Header,
-  HomeView,
+  AdminView,
   ToastProvider,
   ThemeProvider,
 } from '@/components';
-import { useSavedData } from '@/hooks/useSavedData';
 
-function HomePageInner() {
-  const { savedSummaries, savedAudioLogs } = useSavedData();
-
+function AdminPageInner() {
   return (
     <div className="min-h-screen bg-transparent">
       <Header />
 
       <main className="pb-20">
-        <HomeView
-          summaryCount={savedSummaries.length}
-          audioCount={savedAudioLogs.length}
-        />
+        <AdminView />
       </main>
 
       <footer
@@ -34,11 +28,11 @@ function HomePageInner() {
   );
 }
 
-export default function HomePage() {
+export default function AdminPage() {
   return (
     <ThemeProvider>
       <ToastProvider>
-        <HomePageInner />
+        <AdminPageInner />
       </ToastProvider>
     </ThemeProvider>
   );
