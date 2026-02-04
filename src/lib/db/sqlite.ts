@@ -111,6 +111,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         message TEXT NOT NULL,
         cooldown_until TEXT,
         error TEXT,
+        retry_count INTEGER DEFAULT 0,
         pokemon_ids TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -123,6 +124,10 @@ export class SQLiteAdapter implements DatabaseAdapter {
     const hasCooldownUntil = jobColumns.some(c => c.name === 'cooldown_until');
     if (!hasCooldownUntil) {
       this.db.exec('ALTER TABLE jobs ADD COLUMN cooldown_until TEXT');
+    }
+    const hasRetryCount = jobColumns.some(c => c.name === 'retry_count');
+    if (!hasRetryCount) {
+      this.db.exec('ALTER TABLE jobs ADD COLUMN retry_count INTEGER DEFAULT 0');
     }
 
     // Create indexes
@@ -321,8 +326,8 @@ export class SQLiteAdapter implements DatabaseAdapter {
     const initialStage: ProcessingStage = input.mode === 'AUDIO_ONLY' ? 'audio' : 'summary';
     const stmt = this.db!.prepare(`
       INSERT OR REPLACE INTO jobs
-      (id, status, stage, mode, generation_id, region, voice, total, current, message, cooldown_until, error, pokemon_ids, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, status, stage, mode, generation_id, region, voice, total, current, message, cooldown_until, error, retry_count, pokemon_ids, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -338,6 +343,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
       'Queued',
       null,
       null,
+      0,
       JSON.stringify(input.pokemonIds),
       now,
       now
@@ -426,6 +432,20 @@ export class SQLiteAdapter implements DatabaseAdapter {
     await this.setJobStatus(id, 'queued');
   }
 
+  async getAllRunningJobs(): Promise<ProcessingJob[]> {
+    const stmt = this.db!.prepare('SELECT * FROM jobs WHERE status = ? ORDER BY created_at ASC');
+    const rows = stmt.all('running') as DatabaseRow[];
+    return rows.map(this.mapRowToJob);
+  }
+
+  async incrementJobRetry(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    const stmt = this.db!.prepare(
+      'UPDATE jobs SET retry_count = retry_count + 1, updated_at = ? WHERE id = ?'
+    );
+    stmt.run(now, id);
+  }
+
   // Helper methods
   private mapRowToSummary(row: DatabaseRow): StoredSummary {
     return {
@@ -480,21 +500,21 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   private mapRowToJob(row: DatabaseRow): ProcessingJob {
-    const pokemonIds = JSON.parse((row.pokemon_ids as string) || '[]') as number[];
     return {
       id: row.id as string,
-      status: row.status as ProcessingJob['status'],
-      stage: row.stage as ProcessingJob['stage'],
+      status: row.status as JobStatus,
+      stage: row.stage as ProcessingStage,
       mode: row.mode as ProcessingJob['mode'],
       generationId: row.generation_id as number,
       region: row.region as string,
       voice: row.voice as string,
-      pokemonIds,
+      pokemonIds: JSON.parse(row.pokemon_ids as string),
       total: row.total as number,
       current: row.current as number,
       message: row.message as string,
-      cooldownUntil: (row.cooldown_until as string | null) ?? null,
-      error: (row.error as string | null) ?? null,
+      cooldownUntil: row.cooldown_until as string | null,
+      error: row.error as string | null,
+      retryCount: (row.retry_count as number) || 0,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
     };

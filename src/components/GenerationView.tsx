@@ -81,7 +81,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
-      <div className="mb-8 rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
+      <div className="mb-8 rounded-xl border border-amber-100/80 bg-white p-8 shadow-sm">
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
             <label className="text-xs font-semibold tracking-wide text-slate-400 uppercase">
@@ -90,7 +90,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
             <select
               value={selectedGenId}
               onChange={e => onGenChange(Number(e.target.value))}
-              className="h-14 w-full rounded-lg border border-slate-200 bg-white px-4 font-medium text-slate-700 transition-colors outline-none hover:border-slate-300 focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+              className="focus:border-pokeball-300 focus:ring-pokeball-100 h-14 w-full rounded-lg border border-amber-100 bg-white px-4 font-medium text-slate-800 transition-colors outline-none hover:border-amber-200 focus:ring-1"
             >
               {generations.map(g => (
                 <option key={g.id} value={g.id}>
@@ -108,7 +108,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
               <select
                 value={selectedVoice}
                 onChange={e => onVoiceChange(e.target.value)}
-                className="h-14 w-full rounded-lg border border-slate-200 bg-white px-4 font-medium text-slate-700 transition-colors outline-none hover:border-slate-300 focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+                className="focus:border-pokeball-300 focus:ring-pokeball-100 h-14 w-full rounded-lg border border-amber-100 bg-white px-4 font-medium text-slate-800 transition-colors outline-none hover:border-amber-200 focus:ring-1"
               >
                 {VOICE_OPTIONS.map(v => (
                   <option key={v.id} value={v.id}>
@@ -128,7 +128,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
               value={rangeStart}
               onChange={e => onRangeChange(parseInt(e.target.value) || 1, rangeEnd)}
               disabled={selectedIds.size > 0}
-              className="h-14 w-full rounded-lg border border-slate-200 bg-white px-4 font-medium text-slate-600 disabled:opacity-50"
+              className="h-14 w-full rounded-lg border border-amber-100 bg-white px-4 font-medium text-slate-700 disabled:opacity-50"
             />
           </div>
 
@@ -141,7 +141,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
               value={rangeEnd}
               onChange={e => onRangeChange(rangeStart, parseInt(e.target.value) || 1)}
               disabled={selectedIds.size > 0}
-              className="h-14 w-full rounded-lg border border-slate-200 bg-white px-4 font-medium text-slate-600 disabled:opacity-50"
+              className="h-14 w-full rounded-lg border border-amber-100 bg-white px-4 font-medium text-slate-700 disabled:opacity-50"
             />
           </div>
         </div>
@@ -155,7 +155,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
               type="text"
               value={searchQuery}
               onChange={e => onSearchChange(e.target.value)}
-              className="h-14 w-full rounded-lg border border-slate-200 bg-white px-5 font-medium outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
+              className="focus:border-pokeball-300 focus:ring-pokeball-100 h-14 w-full rounded-lg border border-amber-100 bg-white px-5 font-medium outline-none focus:ring-1"
               placeholder="Find by name or ID..."
             />
           </div>

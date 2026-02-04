@@ -11,24 +11,22 @@ import { createJob, getJob, pauseJob, resumeJob, cancelJob } from '@/services/jo
 import {
   getSummariesByGeneration,
   getAllSummaries,
-  deleteSummary,
-  exportSummariesAsJSON,
-  importSummariesFromJSON,
   StoredSummary,
   getAllAudioLogs,
   getAudioLogsByGeneration,
   StoredAudioLog,
-  deleteAudioLog,
 } from '@/services/storageService';
 
 import {
   Header,
   HomeView,
   GenerationView,
-  LibraryView,
+  PokedexLibraryView,
   AdminView,
   ProcessingOverlay,
   ResultsView,
+  ToastProvider,
+  useToast,
 } from '@/components';
 
 import {
@@ -40,7 +38,9 @@ import {
   CooldownState,
 } from '@/types';
 
-export default function Home() {
+function HomeInner() {
+  const { showToast } = useToast();
+
   const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode>(WorkflowMode.FULL);
   const [generations, setGenerations] = useState<Generation[]>([]);
@@ -127,7 +127,12 @@ export default function Home() {
           setActiveJobId(null);
           setIsProcessing(false);
           setCooldown(null);
-          alert(job.error || 'Job failed');
+          showToast({
+            variant: 'error',
+            title: 'Job failed',
+            description: job.error || 'Something went wrong while processing your batch.',
+            durationMs: 6500,
+          });
         }
 
         if (job.status === 'canceled') {
@@ -147,7 +152,7 @@ export default function Home() {
           await loadSavedAudioLogs();
 
           if (job.mode === 'SUMMARY_ONLY') {
-            setCurrentView(AppView.SUMMARY_LIBRARY);
+            setCurrentView(AppView.POKEDEX_LIBRARY);
             return;
           }
 
@@ -166,7 +171,7 @@ export default function Home() {
     return () => {
       clearPoll();
     };
-  }, [activeJobId]);
+  }, [activeJobId, showToast]);
 
   const loadSavedSummaries = async () => {
     const summaries = await getAllSummaries();
@@ -176,32 +181,6 @@ export default function Home() {
   const loadSavedAudioLogs = async () => {
     const audioLogs = await getAllAudioLogs();
     setSavedAudioLogs(audioLogs);
-  };
-
-  const handleDeleteAudioLog = async (id: number) => {
-    await deleteAudioLog(id);
-    await loadSavedAudioLogs();
-  };
-
-  const handleRegenerateAudioLog = async (id: number) => {
-    const summary = savedSummaries.find(s => s.id === id);
-    if (!summary) {
-      alert('No saved summary found for this Pokémon. Generate a summary first.');
-      return;
-    }
-
-    setIsProcessing(true);
-    setProgress({ current: 0, total: 1, message: 'Queued...', stage: 'audio' });
-    setCurrentView(AppView.PROCESSING);
-
-    const jobId = await createJob({
-      mode: 'AUDIO_ONLY',
-      generationId: summary.generationId,
-      region: summary.region,
-      voice: selectedVoice,
-      pokemonIds: [summary.id],
-    });
-    setActiveJobId(jobId);
   };
 
   const handleGenChange = async (genId: number) => {
@@ -287,14 +266,22 @@ export default function Home() {
     }
 
     if (targetIds.length === 0) {
-      alert('Please select at least one Pokémon');
+      showToast({
+        variant: 'warning',
+        title: 'Nothing selected',
+        description: 'Select at least one Pokémon (or set an ID range) to start.',
+      });
       return;
     }
 
     if (workflowMode === WorkflowMode.AUDIO_ONLY) {
       const summariesToProcess = savedSummaries.filter(s => targetIds.includes(s.id));
       if (summariesToProcess.length === 0) {
-        alert('No saved summaries found for selected Pokémon. Generate summaries first.');
+        showToast({
+          variant: 'warning',
+          title: 'No saved summaries',
+          description: 'Generate summaries first, then run Audio Only.',
+        });
         return;
       }
     }
@@ -323,7 +310,12 @@ export default function Home() {
     } catch (e) {
       setIsProcessing(false);
       const msg = e instanceof Error ? e.message : String(e);
-      alert(msg);
+      showToast({
+        variant: 'error',
+        title: 'Could not start job',
+        description: msg,
+        durationMs: 6500,
+      });
     }
   };
 
@@ -346,51 +338,8 @@ export default function Home() {
     setCurrentView(AppView.HOME);
   };
 
-  const handleDeleteSummary = async (id: number) => {
-    await deleteSummary(id);
-    await loadSavedSummaries();
-  };
-
-  const handleExportSummaries = async () => {
-    const json = await exportSummariesAsJSON();
-    const blob = new Blob([json], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'pokemon_summaries.json';
-    a.click();
-  };
-
-  const handleImportSummaries = async (json: string) => {
-    try {
-      await importSummariesFromJSON(json);
-      await loadSavedSummaries();
-      alert('Summaries imported successfully!');
-    } catch {
-      alert('Failed to import summaries. Please check the file format.');
-    }
-  };
-
-  const handleRegenerate = async (id: number) => {
-    const existingSummary = savedSummaries.find(s => s.id === id);
-    const region = existingSummary?.region ?? currentRegion;
-    const genId = existingSummary?.generationId ?? selectedGenId;
-
-    setIsProcessing(true);
-    setProgress({ current: 0, total: 1, message: 'Queued...', stage: 'summary' });
-    setCurrentView(AppView.PROCESSING);
-
-    const jobId = await createJob({
-      mode: 'SUMMARY_ONLY',
-      generationId: genId,
-      region,
-      voice: selectedVoice,
-      pokemonIds: [id],
-    });
-    setActiveJobId(jobId);
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-transparent">
       <Header onNavigate={setCurrentView} currentView={currentView} />
 
       <main className="pb-20">
@@ -427,17 +376,14 @@ export default function Home() {
           />
         )}
 
-        {currentView === AppView.SUMMARY_LIBRARY && (
-          <LibraryView
+        {currentView === AppView.POKEDEX_LIBRARY && (
+          <PokedexLibraryView
             summaries={savedSummaries}
             audioLogs={savedAudioLogs}
-            onRefresh={loadSavedSummaries}
-            onDelete={handleDeleteSummary}
-            onRegenerate={handleRegenerate}
-            onDeleteAudio={handleDeleteAudioLog}
-            onRegenerateAudio={handleRegenerateAudioLog}
-            onExport={handleExportSummaries}
-            onImport={handleImportSummaries}
+            onRefresh={async () => {
+              await loadSavedSummaries();
+              await loadSavedAudioLogs();
+            }}
           />
         )}
 
@@ -464,9 +410,22 @@ export default function Home() {
         />
       )}
 
-      <footer className="border-t border-slate-200 bg-white py-8 text-center">
-        <p className="text-xs text-slate-400">Field Logs Generator &middot; Powered by Gemini AI</p>
+      <footer
+        className="border-t-2 py-8 text-center backdrop-blur"
+        style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-elevated)' }}
+      >
+        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+          Field Logs Generator &middot; Powered by Gemini AI
+        </p>
       </footer>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <ToastProvider>
+      <HomeInner />
+    </ToastProvider>
   );
 }

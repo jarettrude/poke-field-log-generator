@@ -1,34 +1,170 @@
 @import 'tailwindcss';
 
-/* Custom Pokéball Red Theme */
+/* Field Researcher Journal Theme - Inspired by nature expeditions and classic Pokedex */
 @theme {
-  --color-pokeball-50: #fef2f2;
-  --color-pokeball-100: #fee2e2;
-  --color-pokeball-200: #fecaca;
-  --color-pokeball-300: #fca5a5;
-  --color-pokeball-400: #f87171;
-  --color-pokeball-500: #ef4444;
-  --color-pokeball-600: #dc2626;
-  --color-pokeball-700: #b91c1c;
-  --color-pokeball-800: #991b1b;
-  --color-pokeball-900: #7f1d1d;
-  --color-pokeball-950: #450a0a;
+  /* === POKEDEX RED (Classic Device Crimson) === */
+  --color-pokedex-50: #fef2f2;
+  --color-pokedex-100: #fee2e2;
+  --color-pokedex-200: #fecaca;
+  --color-pokedex-300: #fca5a5;
+  --color-pokedex-400: #f87171;
+  --color-pokedex-500: #ef4444;
+  --color-pokedex-600: #dc2626;
+  --color-pokedex-700: #b91c1c;
+  --color-pokedex-800: #991b1b;
+  --color-pokedex-900: #7f1d1d;
+  --color-pokedex-950: #450a0a;
 
-  /* Primary mapped to Pokéball red */
-  --color-primary-50: var(--color-pokeball-50);
-  --color-primary-100: var(--color-pokeball-100);
-  --color-primary-200: var(--color-pokeball-200);
-  --color-primary-300: var(--color-pokeball-300);
-  --color-primary-400: var(--color-pokeball-400);
-  --color-primary-500: var(--color-pokeball-500);
-  --color-primary-600: var(--color-pokeball-600);
-  --color-primary-700: var(--color-pokeball-700);
-  --color-primary-800: var(--color-pokeball-800);
-  --color-primary-900: var(--color-pokeball-900);
-  --color-primary-950: var(--color-pokeball-950);
+  /* === EXPEDITION GREEN (Deep Forest) === */
+  --color-expedition-50: #f2f7f3;
+  --color-expedition-100: #e0ebe2;
+  --color-expedition-200: #c2d7c6;
+  --color-expedition-300: #96baa0;
+  --color-expedition-400: #669975;
+  --color-expedition-500: #477d56;
+  --color-expedition-600: #356342;
+  --color-expedition-700: #2b4f36;
+  --color-expedition-800: #24402d;
+  --color-expedition-900: #1e3426;
+  --color-expedition-950: #0f1c14;
+
+  /* === JOURNAL BROWN (Leather & Parchment) === */
+  --color-journal-50: #faf8f4;
+  --color-journal-100: #f2ede3;
+  --color-journal-200: #e5d9c6;
+  --color-journal-300: #d3bea1;
+  --color-journal-400: #c19f79;
+  --color-journal-500: #b3885d;
+  --color-journal-600: #a67451;
+  --color-journal-700: #8a5d45;
+  --color-journal-800: #704d3d;
+  --color-journal-900: #5c4033;
+  --color-journal-950: #32221a;
+
+  /* === FIELD TEAL (Water & Sky Notes) === */
+  --color-field-50: #f0fdfc;
+  --color-field-100: #ccfbf6;
+  --color-field-200: #99f6ed;
+  --color-field-300: #5eead4;
+  --color-field-400: #2dd4bf;
+  --color-field-500: #14b8a6;
+  --color-field-600: #0d9488;
+  --color-field-700: #0f766e;
+  --color-field-800: #115e59;
+  --color-field-900: #134e4a;
+  --color-field-950: #042f2e;
+
+  /* === MOSS (Muted Organic Greens) === */
+  --color-moss-50: #f6f7f5;
+  --color-moss-100: #e9ebe6;
+  --color-moss-200: #d4d8cd;
+  --color-moss-300: #b4bcab;
+  --color-moss-400: #929d85;
+  --color-moss-500: #758268;
+  --color-moss-600: #5d6852;
+  --color-moss-700: #4a5343;
+  --color-moss-800: #3d4438;
+  --color-moss-900: #343a30;
+  --color-moss-950: #1c1f19;
+
+  /* === EARTH (Warm Neutrals) === */
+  --color-earth-50: #f9f8f6;
+  --color-earth-100: #f0ede8;
+  --color-earth-200: #e0d9cf;
+  --color-earth-300: #cbbfaf;
+  --color-earth-400: #b4a38b;
+  --color-earth-600: #7f6d55;
+  --color-earth-700: #6a5746;
+  --color-earth-800: #58493c;
+  --color-earth-900: #4a3e35;
+  --color-earth-950: #28211c;
+
+  /* === SLATE (Cool Grays for Dark Mode) === */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
 }
 
-/* Base styles */
+/* === SEMANTIC COLOR MAPPINGS === */
+:root {
+  /* Light Mode - Parchment & Leather Journal Aesthetic */
+  --bg-primary: #faf8f4;
+  --bg-secondary: #f2ede3;
+  --bg-tertiary: #ffffff;
+  --bg-elevated: #ffffff;
+
+  --text-primary: #32221a;
+  --text-secondary: #5c4033;
+  --text-tertiary: #8a5d45;
+  --text-inverse: #faf8f4;
+
+  --border-primary: #e5d9c6;
+  --border-secondary: #d3bea1;
+  --border-accent: #477d56;
+
+  --accent-primary: #b91c1c;
+  --accent-primary-hover: #991b1b;
+  --accent-secondary: #356342;
+  --accent-secondary-hover: #2b4f36;
+
+  --surface-card: #ffffff;
+  --surface-card-hover: #f9f8f6;
+  --surface-input: #ffffff;
+  --surface-overlay: rgba(50, 34, 26, 0.6);
+
+  --shadow-sm: 0 1px 2px 0 rgba(50, 34, 26, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(50, 34, 26, 0.12);
+  --shadow-lg: 0 10px 15px -3px rgba(50, 34, 26, 0.15);
+  --shadow-xl: 0 20px 25px -5px rgba(50, 34, 26, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark Mode - Night Forest & Expedition Camp */
+    --bg-primary: #1c1f19;
+    --bg-secondary: #343a30;
+    --bg-tertiary: #3d4438;
+    --bg-elevated: #4a5343;
+
+    --text-primary: #f6f7f5;
+    --text-secondary: #e9ebe6;
+    --text-tertiary: #d4d8cd;
+    --text-inverse: #1c1f19;
+
+    --border-primary: #4a5343;
+    --border-secondary: #5d6852;
+    --border-accent: #758268;
+
+    --accent-primary: #ef4444;
+    --accent-primary-hover: #f87171;
+    --accent-secondary: #669975;
+    --accent-secondary-hover: #96baa0;
+
+    --surface-card: #343a30;
+    --surface-card-hover: #3d4438;
+    --surface-input: #3d4438;
+    --surface-overlay: rgba(0, 0, 0, 0.85);
+
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
+  }
+}
+
+/* === BASE STYLES === */
+* {
+  box-sizing: border-box;
+}
+
 body {
   font-family:
     'Inter',
@@ -37,10 +173,174 @@ body {
     'Segoe UI',
     Roboto,
     sans-serif;
-  background-color: #f8fafc;
-  color: #1e293b;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+/* === COMPONENT UTILITIES === */
+
+/* Cards */
+.card {
+  background: var(--surface-card);
+  border: 2px solid var(--border-primary);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  background: var(--surface-card-hover);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-elevated {
+  background: var(--bg-elevated);
+  border: 3px solid var(--border-accent);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: var(--shadow-xl);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+  border-color: var(--accent-primary);
+}
+
+.btn-primary:hover {
+  background: var(--accent-primary-hover);
+  border-color: var(--accent-primary-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+  background: var(--accent-secondary);
+  color: var(--text-inverse);
+  border-color: var(--accent-secondary);
+}
+
+.btn-secondary:hover {
+  background: var(--accent-secondary-hover);
+  border-color: var(--accent-secondary-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border-color: var(--border-secondary);
+}
+
+.btn-outline:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-accent);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: transparent;
+}
+
+.btn-ghost:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Inputs */
+.input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--text-primary);
+  background: var(--surface-input);
+  border: 2px solid var(--border-primary);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 3px rgba(107, 124, 90, 0.1);
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Select */
+.select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--text-primary);
+  background: var(--surface-input);
+  border: 2px solid var(--border-primary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--border-accent);
+  box-shadow: 0 0 0 3px rgba(107, 124, 90, 0.1);
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1rem;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.badge-primary {
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.badge-secondary {
+  background: var(--accent-secondary);
+  color: var(--text-inverse);
+}
+
+.badge-neutral {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
 }
 
 /* Scrollbar styling */

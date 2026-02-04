@@ -1,4 +1,5 @@
 import React from 'react';
+import { Home, BookOpen, Settings, BookMarked } from 'lucide-react';
 import { AppView } from '../types';
 
 interface HeaderProps {
@@ -8,32 +9,52 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onNavigate, currentView }) => {
   return (
-    <header className="border-b border-slate-100 bg-white px-6 py-8">
-      <div className="mx-auto flex max-w-6xl items-center justify-between">
-        <div className="cursor-pointer" onClick={() => onNavigate(AppView.HOME)}>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-800 transition-colors hover:text-slate-600">
-            Field Logs
-          </h1>
-          <p className="text-xs text-slate-400">Pokédex Audio Generator</p>
+    <header
+      className="border-b-2 shadow-md"
+      style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-elevated)' }}
+    >
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg"
+            style={{ background: 'var(--accent-primary)' }}
+          >
+            <BookMarked className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              Field Logs
+            </h1>
+            <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+              Pokédex Research System
+            </p>
+          </div>
         </div>
-        <nav className="flex gap-1">
-          {[
-            { view: AppView.HOME, label: 'Home' },
-            { view: AppView.SUMMARY_LIBRARY, label: 'Library' },
-            { view: AppView.ADMIN, label: 'Settings' },
-          ].map(({ view, label }) => (
-            <button
-              key={view}
-              onClick={() => onNavigate(view)}
-              className={`rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-                currentView === view
-                  ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+
+        <nav className="flex gap-2">
+          <button
+            onClick={() => onNavigate(AppView.HOME)}
+            className={currentView === AppView.HOME ? 'btn btn-primary' : 'btn btn-ghost'}
+          >
+            <Home className="h-4 w-4" />
+            Home
+          </button>
+          <button
+            onClick={() => onNavigate(AppView.POKEDEX_LIBRARY)}
+            className={
+              currentView === AppView.POKEDEX_LIBRARY ? 'btn btn-primary' : 'btn btn-ghost'
+            }
+          >
+            <BookOpen className="h-4 w-4" />
+            Pokédex
+          </button>
+          <button
+            onClick={() => onNavigate(AppView.ADMIN)}
+            className={currentView === AppView.ADMIN ? 'btn btn-primary' : 'btn btn-ghost'}
+          >
+            <Settings className="h-4 w-4" />
+            Settings
+          </button>
         </nav>
       </div>
     </header>

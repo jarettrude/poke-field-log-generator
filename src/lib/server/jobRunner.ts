@@ -22,7 +22,11 @@ import {
 import { getOrFetchPokemonDetailsServer } from './pokemon';
 
 let runnerStarted = false;
-let isTicking = false;
+const activeJobs = new Map<string, Promise<void>>();
+const MAX_CONCURRENT_TEXT_JOBS = 3;
+const MAX_CONCURRENT_AUDIO_JOBS = 1;
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY_MS = 5000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -131,16 +135,44 @@ async function processSummaryStage(job: ProcessingJob): Promise<'ok' | 'paused' 
       message: `Generating summary for #${pokemonId}...`,
     });
 
-    const details = await getOrFetchPokemonDetailsServer(pokemonId);
-    const summary = await generateSummary(details, job.region);
+    let retryCount = 0;
+    let success = false;
 
-    await db.saveSummary({
-      id: details.id,
-      name: details.name,
-      summary,
-      region: job.region,
-      generationId: job.generationId,
-    });
+    while (!success && retryCount < MAX_RETRIES) {
+      try {
+        const details = await getOrFetchPokemonDetailsServer(pokemonId);
+        const summary = await generateSummary(details, job.region);
+
+        await db.saveSummary({
+          id: details.id,
+          name: details.name,
+          summary,
+          region: job.region,
+          generationId: job.generationId,
+        });
+
+        success = true;
+      } catch (error) {
+        retryCount++;
+
+        if (retryCount >= MAX_RETRIES) {
+          throw error;
+        }
+
+        const backoffMs = RETRY_BASE_DELAY_MS * Math.pow(2, retryCount - 1);
+        await setProgress({
+          jobId: job.id,
+          stage: 'summary',
+          current: idx,
+          total,
+          message: `Error on #${pokemonId}, retrying in ${Math.round(backoffMs / 1000)}s... (${retryCount}/${MAX_RETRIES})`,
+        });
+
+        await db.incrementJobRetry(job.id);
+        const result = await sleepWithJobControl(job.id, backoffMs);
+        if (result !== 'ok') return result;
+      }
+    }
 
     await setProgress({
       jobId: job.id,
@@ -216,10 +248,38 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
       message: `Synthesizing batch ${batchIdx + 1}/${totalBatches}...`,
     });
 
-    const combinedText = combineSummariesForTts(
-      batch.map(s => ({ id: s.id, name: s.name, text: s.summary }))
-    );
-    const audioData = await generateTts({ text: combinedText, voiceName: job.voice, isBulk: true });
+    let audioData = '';
+    let retryCount = 0;
+    let success = false;
+
+    while (!success && retryCount < MAX_RETRIES) {
+      try {
+        const combinedText = combineSummariesForTts(
+          batch.map(s => ({ id: s.id, name: s.name, text: s.summary }))
+        );
+        audioData = await generateTts({ text: combinedText, voiceName: job.voice, isBulk: true });
+        success = true;
+      } catch (error) {
+        retryCount++;
+
+        if (retryCount >= MAX_RETRIES) {
+          throw error;
+        }
+
+        const backoffMs = RETRY_BASE_DELAY_MS * Math.pow(2, retryCount - 1);
+        await setProgress({
+          jobId: job.id,
+          stage: 'audio',
+          current: batchIdx,
+          total: totalBatches,
+          message: `TTS error on batch ${batchIdx + 1}, retrying in ${Math.round(backoffMs / 1000)}s... (${retryCount}/${MAX_RETRIES})`,
+        });
+
+        await db.incrementJobRetry(job.id);
+        const result = await sleepWithJobControl(job.id, backoffMs);
+        if (result !== 'ok') return result;
+      }
+    }
 
     await setProgress({
       jobId: job.id,
@@ -346,17 +406,36 @@ async function processJob(job: ProcessingJob): Promise<void> {
 }
 
 async function tick(): Promise<void> {
-  if (isTicking) return;
-  isTicking = true;
+  const db = await getDatabase();
+  const runningJobs = await db.getAllRunningJobs();
 
-  try {
-    const db = await getDatabase();
-    const claimed = await db.claimNextQueuedJob();
-    if (!claimed) return;
-    await processJob(claimed.job);
-  } finally {
-    isTicking = false;
+  const textJobCount = runningJobs.filter(j => j.stage === 'summary').length;
+  const audioJobCount = runningJobs.filter(j => j.stage === 'audio').length;
+
+  const canClaimTextJob = textJobCount < MAX_CONCURRENT_TEXT_JOBS;
+  const canClaimAudioJob = audioJobCount < MAX_CONCURRENT_AUDIO_JOBS;
+
+  if (!canClaimTextJob && !canClaimAudioJob) {
+    return;
   }
+
+  const claimed = await db.claimNextQueuedJob();
+  if (!claimed) return;
+
+  const job = claimed.job;
+  const shouldProcessJob =
+    (job.stage === 'summary' && canClaimTextJob) || (job.stage === 'audio' && canClaimAudioJob);
+
+  if (!shouldProcessJob) {
+    await db.setJobStatus(job.id, 'queued');
+    return;
+  }
+
+  const jobPromise = processJob(job).finally(() => {
+    activeJobs.delete(job.id);
+  });
+
+  activeJobs.set(job.id, jobPromise);
 }
 
 export function startJobRunner(): void {

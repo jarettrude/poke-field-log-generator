@@ -141,4 +141,12 @@ export class MySQLAdapter implements DatabaseAdapter {
   async resumeJob(_id: string): Promise<void> {
     throw new Error('Not implemented');
   }
+
+  async getAllRunningJobs(): Promise<ProcessingJob[]> {
+    throw new Error('Not implemented');
+  }
+
+  async incrementJobRetry(_id: string): Promise<void> {
+    throw new Error('Not implemented');
+  }
 }

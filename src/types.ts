@@ -38,7 +38,7 @@ export enum WorkflowMode {
 export enum AppView {
   HOME = 'HOME', // Mode selection
   GENERATION = 'GENERATION', // Generation/range selection
-  SUMMARY_LIBRARY = 'SUMMARY_LIBRARY', // View/edit saved summaries
+  POKEDEX_LIBRARY = 'POKEDEX_LIBRARY', // Unified Pokedex library
   ADMIN = 'ADMIN', // Edit prompts
   PROCESSING = 'PROCESSING', // Processing overlay
   RESULTS = 'RESULTS', // View results

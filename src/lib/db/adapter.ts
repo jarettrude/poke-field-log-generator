@@ -97,6 +97,7 @@ export interface ProcessingJob {
   message: string;
   cooldownUntil: string | null;
   error: string | null;
+  retryCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -145,6 +146,7 @@ export interface DatabaseAdapter {
   createJob(input: CreateJobInput): Promise<void>;
   getJob(id: string): Promise<ProcessingJob | null>;
   claimNextQueuedJob(): Promise<{ job: ProcessingJob; pokemonIds: number[] } | null>;
+  getAllRunningJobs(): Promise<ProcessingJob[]>;
   setJobStatus(id: string, status: JobStatus): Promise<void>;
   setJobProgress(
     id: string,
@@ -155,6 +157,7 @@ export interface DatabaseAdapter {
   ): Promise<void>;
   setJobCooldownUntil(id: string, cooldownUntil: string | null): Promise<void>;
   setJobError(id: string, error: string): Promise<void>;
+  incrementJobRetry(id: string): Promise<void>;
   cancelJob(id: string): Promise<void>;
   pauseJob(id: string): Promise<void>;
   resumeJob(id: string): Promise<void>;

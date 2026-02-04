@@ -23,7 +23,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ results, onClear, onBa
         <div className="flex gap-3">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium hover:bg-slate-200"
+            className="flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-2 text-sm font-medium text-slate-800 hover:bg-amber-100"
           >
             <ArrowLeft className="h-4 w-4" /> New Mission
           </button>
@@ -38,7 +38,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ results, onClear, onBa
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {results.map(r => (
-          <div key={r.id} className="rounded-xl border border-slate-200 bg-white p-5">
+          <div key={r.id} className="rounded-xl border border-amber-100/80 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-3">
               <Image
                 src={r.pngData || r.svgData || POKEBALL_IMAGE}
