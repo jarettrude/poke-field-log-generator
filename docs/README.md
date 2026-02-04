@@ -2,11 +2,11 @@
 
 Generate immersive, cinematic Pokemon field logs narrated like a nature documentary. Transform any Pokemon into a detailed researcher's observation with AI-generated narratives and professional voice narration.
 
-![Pokedex Field Log Generator](./docs/Pokedex-Field-Log-Generator.png)
-
 ## Overview
 
 The Pokedex Field Log Generator creates authentic field researcher logs for Pokemon, combining AI-generated narratives with high-quality text-to-speech narration. Each log reads like an entry from a naturalist's journal, complete with atmospheric descriptions, behavioral observations, and references to Pokemon abilities and habitats.
+
+![Pokedex Field Log Generator](./Pokedex-Field-Log-Generator.png)
 
 ## Features
 
@@ -110,9 +110,14 @@ The application generates field logs like this:
 
 **Example Files:**
 
-- [Text Log](./docs/example/0001-bulbasaur.md) - Complete field log narrative
-- [Image](./docs/example/0001-bulbasaur.svg) - Pokemon artwork from PokeAPI
-- [Audio](./docs/example/0001-bulbasaur.wav) - Professional narration (6MB WAV file)
+![Bulbasaur Image](./example/0001-bulbasaur.svg)
+
+**Listen to the narration:**
+
+https://github.com/jarettrude/poke-field-log-generator/raw/main/docs/example/0001-bulbasaur.mp3
+
+- [Text Log](./example/0001-bulbasaur.md) - Complete field log narrative
+- [Audio File](./example/0001-bulbasaur.mp3) - Professional narration (~2MB MP3)
 
 ## Technical Stack
 
