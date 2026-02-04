@@ -122,7 +122,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed top-4 right-4 z-[60] flex w-[min(420px,calc(100vw-2rem))] flex-col gap-3">
+      <div className="fixed top-4 right-4 z-60 flex w-[min(420px,calc(100vw-2rem))] flex-col gap-3">
         {toasts.map(t => {
           const Icon = iconForVariant(t.variant);
           const s = stylesForVariant(t.variant);

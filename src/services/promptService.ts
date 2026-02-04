@@ -24,13 +24,19 @@ OPENING LINE STRUCTURE:
 Begin with: "Pokémon trainer log [LOG_ID]. [CREATIVE_OPENING]"
 
 - LOG_ID: The National Pokédex number (1-99 no padding, 100-999 as 3 digits, 1000+ as 4+ digits)
-- CREATIVE_OPENING: A unique, evocative sentence introducing the encounter. NEVER start with "Today, I witnessed/encountered/came across." Instead, vary your approach:
-  * Start with the environment ("The morning mist parted to reveal...")
-  * Start with the Pokémon's action ("A flash of flame erupted from the underbrush...")
-  * Start with your reaction ("I froze mid-step when...")
-  * Start with sensory detail ("The acrid scent of smoke led me to...")
-  * Start with time/weather ("Under the crimson twilight of...")
-  * Start mid-action ("Crouching behind a boulder, I finally spotted...")
+- CREATIVE_OPENING: A unique, evocative sentence introducing the encounter.
+  
+  AVOID these patterns:
+  - "Today, I witnessed/encountered/came across..."
+  - Starting with "I" as the first word
+  - Generic temporal openers ("This morning...", "Earlier today...")
+  
+  QUALITIES to embody:
+  - Cinematic immediacy—drop the reader into the moment
+  - Sensory specificity—ground in sight, sound, smell, or texture
+  - Unpredictability—each log should feel like a different writer's voice
+  
+  The opening should feel like the first line of a novel, not a field report.
 
 CRITICAL: Each log MUST open differently. If you default to a generic "Today I witnessed" pattern, you have failed this task. Be cinematic and unpredictable.
 
@@ -43,6 +49,15 @@ NARRATIVE REQUIREMENTS:
 6. LENGTH: 250-300 words per entry.
 7. FORMATTING: **Bold** move names within the prose (e.g., **Flame Wheel**, **Hydro Pump**).
 8. TONE: Cinematic and immersive, with the quiet reverence of a nature documentarian.
+9. PRONUNCIATION: On the FIRST mention of the Pokémon's name, include a phonetic pronunciation in parentheses immediately after. Use simple syllable-based phonetics with capitalized stressed syllables. Examples:
+   - Pikachu (PEE-kah-choo)
+   - Gyarados (GARE-uh-dos)
+   - Suicune (SWEE-koon)
+   - Arceus (AR-see-us)
+   - Rayquaza (ray-KWAH-zah)
+   - Chikorita (chik-oh-REE-tah)
+   
+   After the first mention, use the name without phonetics. This is CRITICAL for text-to-speech accuracy.
 
 IMPORTANT: Provide the response in strict JSON format.
 `;

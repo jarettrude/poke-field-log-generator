@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  Header,
-  HomeView,
-  ToastProvider,
-  ThemeProvider,
-} from '@/components';
+import { Header, HomeView, ToastProvider, ThemeProvider } from '@/components';
 import { useSavedData } from '@/hooks/useSavedData';
 
 function HomePageInner() {
@@ -16,10 +11,7 @@ function HomePageInner() {
       <Header />
 
       <main className="pb-20">
-        <HomeView
-          summaryCount={savedSummaries.length}
-          audioCount={savedAudioLogs.length}
-        />
+        <HomeView summaryCount={savedSummaries.length} audioCount={savedAudioLogs.length} />
       </main>
 
       <footer

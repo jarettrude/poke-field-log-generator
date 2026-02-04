@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  Header,
-  AdminView,
-  ToastProvider,
-  ThemeProvider,
-} from '@/components';
+import { Header, AdminView, ToastProvider, ThemeProvider } from '@/components';
 
 function AdminPageInner() {
   return (

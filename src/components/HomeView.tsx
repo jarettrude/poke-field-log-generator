@@ -36,7 +36,8 @@ export const HomeView: React.FC<HomeViewProps> = ({ summaryCount, audioCount }) 
             Generate New Logs
           </h3>
           <p className="mb-4 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            Create summaries and audio for Pokémon. Choose full pipeline, text-only, or audio-only modes.
+            Create summaries and audio for Pokémon. Choose full pipeline, text-only, or audio-only
+            modes.
           </p>
           <span
             className="inline-flex items-center gap-2 text-sm font-semibold"

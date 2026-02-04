@@ -75,3 +75,24 @@ export async function cancelJob(id: string): Promise<void> {
   const response = await fetch(`${API_BASE}/${id}/cancel`, { method: 'POST' });
   await handleResponse(response);
 }
+
+export async function recoverStalledJobs(params?: {
+  stalledThresholdMs?: number;
+}): Promise<{ recoveredCount: number }> {
+  const response = await fetch(`${API_BASE}/maintenance/recover`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params || {}),
+  });
+  return handleResponse<{ recoveredCount: number }>(response);
+}
+
+export async function pauseAllRunningJobs(): Promise<{ pausedCount: number }> {
+  const response = await fetch(`${API_BASE}/maintenance/pause-all`, { method: 'POST' });
+  return handleResponse<{ pausedCount: number }>(response);
+}
+
+export async function cancelAllRunningJobs(): Promise<{ canceledCount: number }> {
+  const response = await fetch(`${API_BASE}/maintenance/cancel-all`, { method: 'POST' });
+  return handleResponse<{ canceledCount: number }>(response);
+}

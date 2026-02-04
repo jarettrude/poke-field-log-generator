@@ -111,11 +111,7 @@ const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId, audioMeta 
         className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all hover:opacity-80 disabled:opacity-50"
         style={{ background: 'var(--accent-secondary)', color: 'var(--text-inverse)' }}
       >
-        {isLoading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Play className="h-4 w-4" />
-        )}
+        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
         {isLoading ? 'Loading...' : 'Play Audio'}
       </button>
     );
@@ -177,6 +173,17 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   const [rangeEnd, setRangeEnd] = useState<number>(151);
   const [pokemonImages, setPokemonImages] = useState<Map<number, CachedPokemonImage>>(new Map());
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const getIdBounds = useCallback((ids: number[]) => {
+    if (ids.length === 0) return null;
+    let min = ids[0]!;
+    let max = ids[0]!;
+    for (const id of ids) {
+      if (id < min) min = id;
+      if (id > max) max = id;
+    }
+    return { min, max };
+  }, []);
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -291,6 +298,12 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
     });
   }, [entries, generationFilter, regionFilter, contentFilter, searchQuery]);
 
+  const filteredEntryIds = useMemo(() => filteredEntries.map(e => e.id), [filteredEntries]);
+  const filteredIdBounds = useMemo(
+    () => getIdBounds(filteredEntryIds),
+    [filteredEntryIds, getIdBounds]
+  );
+
   const generations = useMemo(() => {
     return [...new Set(entries.map(e => e.generationId))].sort();
   }, [entries]);
@@ -312,6 +325,9 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   };
 
   const toggleSelect = (id: number) => {
+    if (selectionMode !== 'manual') {
+      setSelectionMode('manual');
+    }
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -323,26 +339,113 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
     });
   };
 
+  const computeSelectionForMode = useCallback(
+    (
+      mode: typeof selectionMode,
+      opts?: {
+        start?: number;
+        end?: number;
+      }
+    ) => {
+      const newSelection = new Set<number>();
+
+      if (filteredEntries.length === 0) return newSelection;
+
+      if (mode === 'range') {
+        const start = opts?.start ?? rangeStart;
+        const end = opts?.end ?? rangeEnd;
+        const low = Math.min(start, end);
+        const high = Math.max(start, end);
+
+        for (const entry of filteredEntries) {
+          if (entry.id >= low && entry.id <= high) {
+            newSelection.add(entry.id);
+          }
+        }
+        return newSelection;
+      }
+
+      if (mode === 'generation') {
+        if (generationFilter === 'all') return newSelection;
+        for (const entry of filteredEntries) {
+          if (entry.generationId === generationFilter) {
+            newSelection.add(entry.id);
+          }
+        }
+        return newSelection;
+      }
+
+      if (mode === 'region') {
+        if (regionFilter === 'all') return newSelection;
+        for (const entry of filteredEntries) {
+          if (entry.region === regionFilter) {
+            newSelection.add(entry.id);
+          }
+        }
+        return newSelection;
+      }
+
+      return newSelection;
+    },
+    [filteredEntries, generationFilter, rangeEnd, rangeStart, regionFilter]
+  );
+
   const handleSelectionModeChange = (mode: typeof selectionMode) => {
     setSelectionMode(mode);
-    const newSelection = new Set<number>();
 
-    if (mode === 'range') {
-      for (let i = rangeStart; i <= rangeEnd; i++) {
-        if (filteredEntries.some(e => e.id === i)) {
-          newSelection.add(i);
-        }
-      }
-    } else if (mode === 'generation' && generationFilter !== 'all') {
-      filteredEntries
-        .filter(e => e.generationId === generationFilter)
-        .forEach(e => newSelection.add(e.id));
-    } else if (mode === 'region' && regionFilter !== 'all') {
-      filteredEntries.filter(e => e.region === regionFilter).forEach(e => newSelection.add(e.id));
+    if (mode === 'manual') {
+      return;
     }
 
-    setSelectedIds(newSelection);
+    if (mode === 'range') {
+      const bounds = filteredIdBounds;
+      if (bounds) {
+        setRangeStart(bounds.min);
+        setRangeEnd(bounds.max);
+        setSelectedIds(computeSelectionForMode('range', { start: bounds.min, end: bounds.max }));
+        return;
+      }
+    }
+
+    setSelectedIds(computeSelectionForMode(mode));
   };
+
+  useEffect(() => {
+    if (selectionMode === 'manual') return;
+
+    if (selectionMode === 'range') {
+      if (!filteredIdBounds) {
+        setSelectedIds(new Set());
+        return;
+      }
+
+      const low = Math.min(rangeStart, rangeEnd);
+      const high = Math.max(rangeStart, rangeEnd);
+      const nextStart = Math.max(filteredIdBounds.min, low);
+      const nextEnd = Math.min(filteredIdBounds.max, high);
+
+      if (nextStart !== low || nextEnd !== high) {
+        setRangeStart(nextStart);
+        setRangeEnd(nextEnd);
+        setSelectedIds(computeSelectionForMode('range', { start: nextStart, end: nextEnd }));
+        return;
+      }
+
+      setSelectedIds(computeSelectionForMode('range'));
+      return;
+    }
+
+    setSelectedIds(computeSelectionForMode(selectionMode));
+  }, [
+    computeSelectionForMode,
+    filteredEntries.length,
+    filteredIdBounds,
+    generationFilter,
+    rangeEnd,
+    rangeStart,
+    regionFilter,
+    selectionMode,
+  ]);
 
   const handleDownload = async () => {
     if (selectedIds.size === 0) {
@@ -667,7 +770,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         {/* Clear Selection */}
         {selectedIds.size > 0 && (
           <button
-            onClick={() => setSelectedIds(new Set())}
+            onClick={() => {
+              setSelectionMode('manual');
+              setSelectedIds(new Set());
+            }}
             className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all"
             style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
           >

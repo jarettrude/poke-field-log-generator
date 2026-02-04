@@ -196,7 +196,9 @@ export const getAudioLog = async (id: number): Promise<StoredAudioLog | null> =>
 /**
  * Get all audio logs metadata for a generation (no audioBase64 - use getAudioLog for full data).
  */
-export const getAudioLogsByGeneration = async (generationId: number): Promise<AudioLogMetadata[]> => {
+export const getAudioLogsByGeneration = async (
+  generationId: number
+): Promise<AudioLogMetadata[]> => {
   const response = await fetch(`${API_BASE}/audio?generationId=${generationId}`);
   return handleResponse<AudioLogMetadata[]>(response);
 };

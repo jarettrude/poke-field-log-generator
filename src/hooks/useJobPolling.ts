@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { getJob } from '@/services/jobsService';
 import { useToast } from '@/components/ToastProvider';
-import { getSummariesByGeneration, getAudioLogsByGeneration, getAudioLog } from '@/services/storageService';
+import {
+  getSummariesByGeneration,
+  getAudioLogsByGeneration,
+  getAudioLog,
+} from '@/services/storageService';
 import { ProcessedPokemon, CooldownState } from '@/types';
 
 interface UseJobPollingProps {
