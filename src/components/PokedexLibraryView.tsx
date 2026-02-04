@@ -18,7 +18,12 @@ import {
   Pencil,
   Save,
 } from 'lucide-react';
-import { StoredSummary, AudioLogMetadata, getAudioLog, saveSummary } from '../services/storageService';
+import {
+  StoredSummary,
+  AudioLogMetadata,
+  getAudioLog,
+  saveSummary,
+} from '../services/storageService';
 import { formatPokemonId } from '../utils/pokemonUtils';
 import { pcmToWav } from '../services/audioUtils';
 import JSZip from 'jszip';
@@ -933,14 +938,20 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                 {hasText && (
                   <div className="mb-3">
                     <div className="mb-2 flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                      <span
+                        className="text-xs font-semibold"
+                        style={{ color: 'var(--text-tertiary)' }}
+                      >
                         Script
                       </span>
                       {!isEditingSummary ? (
                         <button
                           onClick={() => startEditingSummary(entry)}
                           className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:opacity-80"
-                          style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                          style={{
+                            background: 'var(--bg-secondary)',
+                            color: 'var(--text-secondary)',
+                          }}
                         >
                           <Pencil className="h-3 w-3" />
                           Edit
@@ -951,7 +962,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                             onClick={() => void saveEditedSummary(entry)}
                             disabled={isSavingSummary}
                             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:opacity-80 disabled:opacity-50"
-                            style={{ background: 'var(--accent-secondary)', color: 'var(--text-inverse)' }}
+                            style={{
+                              background: 'var(--accent-secondary)',
+                              color: 'var(--text-inverse)',
+                            }}
                           >
                             {isSavingSummary ? (
                               <Loader2 className="h-3 w-3 animate-spin" />
@@ -964,7 +978,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                             onClick={cancelEditingSummary}
                             disabled={isSavingSummary}
                             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:opacity-80 disabled:opacity-50"
-                            style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                            style={{
+                              background: 'var(--bg-secondary)',
+                              color: 'var(--text-secondary)',
+                            }}
                           >
                             <X className="h-3 w-3" />
                             Cancel
