@@ -169,39 +169,6 @@ export const AdminView: React.FC = () => {
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       <h2 className="mb-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-        Job Maintenance
-      </h2>
-      <p className="mb-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
-        Use these tools to recover from crashes or intentionally stop work before restarting.
-      </p>
-
-      <div className="card-elevated mb-10 overflow-hidden">
-        <div className="flex flex-col gap-3 p-6">
-          <button
-            onClick={handleRecoverStalled}
-            disabled={maintenanceLoading !== null}
-            className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {maintenanceLoading === 'recover' ? 'Recovering...' : 'Recover Stalled Jobs'}
-          </button>
-          <button
-            onClick={handlePauseAll}
-            disabled={maintenanceLoading !== null}
-            className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {maintenanceLoading === 'pauseAll' ? 'Pausing...' : 'Pause All Running Jobs'}
-          </button>
-          <button
-            onClick={handleCancelAll}
-            disabled={maintenanceLoading !== null}
-            className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {maintenanceLoading === 'cancelAll' ? 'Canceling...' : 'Cancel All Running Jobs'}
-          </button>
-        </div>
-      </div>
-
-      <h2 className="mb-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
         Prompt Settings
       </h2>
       <p className="mb-8 text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -269,6 +236,37 @@ export const AdminView: React.FC = () => {
               {loading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
+        </div>
+      </div>
+      <h2 className="mt-8 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+        Job Maintenance
+      </h2>
+      <p className="mb-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+        Use these tools to recover from crashes or intentionally stop work before restarting.
+      </p>
+      <div className="card-elevated mb-10 overflow-hidden">
+        <div className="flex flex-col gap-3 p-6">
+          <button
+            onClick={handleRecoverStalled}
+            disabled={maintenanceLoading !== null}
+            className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {maintenanceLoading === 'recover' ? 'Recovering...' : 'Recover Stalled Jobs'}
+          </button>
+          <button
+            onClick={handlePauseAll}
+            disabled={maintenanceLoading !== null}
+            className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {maintenanceLoading === 'pauseAll' ? 'Pausing...' : 'Pause All Running Jobs'}
+          </button>
+          <button
+            onClick={handleCancelAll}
+            disabled={maintenanceLoading !== null}
+            className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {maintenanceLoading === 'cancelAll' ? 'Canceling...' : 'Cancel All Running Jobs'}
+          </button>
         </div>
       </div>
     </div>

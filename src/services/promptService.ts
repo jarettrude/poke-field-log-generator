@@ -49,7 +49,7 @@ NARRATIVE REQUIREMENTS:
 6. LENGTH: 250-300 words per entry.
 7. FORMATTING: **Bold** move names within the prose (e.g., **Flame Wheel**, **Hydro Pump**).
 8. TONE: Cinematic and immersive, with the quiet reverence of a nature documentarian.
-9. PRONUNCIATION: On the FIRST mention of the Pokémon's name, include a phonetic pronunciation in parentheses immediately after. Use simple syllable-based phonetics with capitalized stressed syllables. Examples:
+9. PRONUNCIATION: On the FIRST mention of each Pokémon's name, include a phonetic pronunciation in parentheses immediately after. Use simple syllable-based phonetics with capitalized stressed syllables. Examples:
    - Pikachu (PEE-kah-choo)
    - Gyarados (GARE-uh-dos)
    - Suicune (SWEE-koon)
@@ -57,7 +57,7 @@ NARRATIVE REQUIREMENTS:
    - Rayquaza (ray-KWAH-zah)
    - Chikorita (chik-oh-REE-tah)
    
-   After the first mention, use the name without phonetics. This is CRITICAL for text-to-speech accuracy.
+   After the first mention of each Pokémon name, use the name without phonetics. This is CRITICAL for text-to-speech accuracy.
 
 IMPORTANT: Provide the response in strict JSON format.
 `;

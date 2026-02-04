@@ -15,8 +15,10 @@ import {
   Play,
   Pause,
   Loader2,
+  Pencil,
+  Save,
 } from 'lucide-react';
-import { StoredSummary, AudioLogMetadata, getAudioLog } from '../services/storageService';
+import { StoredSummary, AudioLogMetadata, getAudioLog, saveSummary } from '../services/storageService';
 import { formatPokemonId } from '../utils/pokemonUtils';
 import { pcmToWav } from '../services/audioUtils';
 import JSZip from 'jszip';
@@ -173,6 +175,9 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   const [rangeEnd, setRangeEnd] = useState<number>(151);
   const [pokemonImages, setPokemonImages] = useState<Map<number, CachedPokemonImage>>(new Map());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editingSummaryId, setEditingSummaryId] = useState<number | null>(null);
+  const [summaryDraft, setSummaryDraft] = useState('');
+  const [savingSummaryIds, setSavingSummaryIds] = useState<Set<number>>(new Set());
 
   const getIdBounds = useCallback((ids: number[]) => {
     if (ids.length === 0) return null;
@@ -322,6 +327,55 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
       }
       return next;
     });
+  };
+
+  const startEditingSummary = (entry: PokedexEntry) => {
+    setEditingSummaryId(entry.id);
+    setSummaryDraft(entry.summary ?? '');
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      next.add(entry.id);
+      return next;
+    });
+  };
+
+  const cancelEditingSummary = () => {
+    setEditingSummaryId(null);
+    setSummaryDraft('');
+  };
+
+  const saveEditedSummary = async (entry: PokedexEntry) => {
+    if (!entry.summary && summaryDraft.trim().length === 0) {
+      cancelEditingSummary();
+      return;
+    }
+
+    setSavingSummaryIds(prev => {
+      const next = new Set(prev);
+      next.add(entry.id);
+      return next;
+    });
+
+    try {
+      await saveSummary({
+        id: entry.id,
+        name: entry.name,
+        region: entry.region,
+        generationId: entry.generationId,
+        summary: summaryDraft,
+      });
+      cancelEditingSummary();
+      onRefresh();
+    } catch (e) {
+      console.error('Failed to save summary:', e);
+      alert('Failed to save summary. Please try again.');
+    } finally {
+      setSavingSummaryIds(prev => {
+        const next = new Set(prev);
+        next.delete(entry.id);
+        return next;
+      });
+    }
   };
 
   const toggleSelect = (id: number) => {
@@ -791,6 +845,8 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           const hasAudio = entry.hasAudio;
           const cachedImage = pokemonImages.get(entry.id);
           const imageSrc = cachedImage?.imageSvgPath || cachedImage?.imagePngPath;
+          const isEditingSummary = editingSummaryId === entry.id;
+          const isSavingSummary = savingSummaryIds.has(entry.id);
 
           return (
             <div
@@ -876,12 +932,62 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
 
                 {hasText && (
                   <div className="mb-3">
-                    <p
-                      className={`text-sm leading-relaxed ${isExpanded ? '' : 'line-clamp-3'}`}
-                      style={{ color: 'var(--text-secondary)' }}
-                    >
-                      {entry.summary}
-                    </p>
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                        Script
+                      </span>
+                      {!isEditingSummary ? (
+                        <button
+                          onClick={() => startEditingSummary(entry)}
+                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:opacity-80"
+                          style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                        >
+                          <Pencil className="h-3 w-3" />
+                          Edit
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => void saveEditedSummary(entry)}
+                            disabled={isSavingSummary}
+                            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:opacity-80 disabled:opacity-50"
+                            style={{ background: 'var(--accent-secondary)', color: 'var(--text-inverse)' }}
+                          >
+                            {isSavingSummary ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Save className="h-3 w-3" />
+                            )}
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEditingSummary}
+                            disabled={isSavingSummary}
+                            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:opacity-80 disabled:opacity-50"
+                            style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                          >
+                            <X className="h-3 w-3" />
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {!isEditingSummary ? (
+                      <p
+                        className={`text-sm leading-relaxed ${isExpanded ? '' : 'line-clamp-3'}`}
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        {entry.summary}
+                      </p>
+                    ) : (
+                      <textarea
+                        value={summaryDraft}
+                        onChange={e => setSummaryDraft(e.target.value)}
+                        className="input min-h-32 resize-y text-sm leading-relaxed"
+                        style={{ color: 'var(--text-primary)' }}
+                      />
+                    )}
                     <button
                       onClick={() => toggleExpand(entry.id)}
                       className="mt-2 flex items-center gap-1 text-xs font-semibold transition-colors"
