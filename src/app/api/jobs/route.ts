@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { getDatabase } from '@/lib/db/adapter';
 import { startJobRunner } from '@/lib/server/jobRunner';
+import { successResponse, errorResponse } from '@/lib/server/api';
 
 export const runtime = 'nodejs';
 
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       !Array.isArray(pokemonIds) ||
       pokemonIds.length === 0
     ) {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      return errorResponse('Invalid request body', 400);
     }
 
     const normalized = Array.from(new Set(pokemonIds))
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       .sort((a, b) => a - b);
 
     if (normalized.length === 0) {
-      return NextResponse.json({ error: 'No valid pokemonIds provided' }, { status: 400 });
+      return errorResponse('No valid pokemonIds provided', 400);
     }
 
     const id = randomUUID();
@@ -50,9 +50,9 @@ export async function POST(request: Request) {
       pokemonIds: normalized,
     });
 
-    return NextResponse.json({ id });
+    return successResponse({ id });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return errorResponse(msg, 500);
   }
 }

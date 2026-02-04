@@ -149,4 +149,8 @@ export class MySQLAdapter implements DatabaseAdapter {
   async incrementJobRetry(_id: string): Promise<void> {
     throw new Error('Not implemented');
   }
+
+  async recoverStalledJobs(_stalledThresholdMs: number): Promise<number> {
+    throw new Error('Not implemented');
+  }
 }

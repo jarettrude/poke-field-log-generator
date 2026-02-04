@@ -1,15 +1,17 @@
-import { NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/db/adapter';
+import { successResponse, errorResponse } from '@/lib/server/api';
+
+export const runtime = 'nodejs';
 
 export async function GET() {
   try {
     const db = await getDatabase();
     const prompts = await db.getAllPrompts();
 
-    return NextResponse.json(prompts);
+    return successResponse(prompts);
   } catch (error) {
     console.error('Error fetching prompts:', error);
-    return NextResponse.json({ error: 'Failed to fetch prompts' }, { status: 500 });
+    return errorResponse('Failed to fetch prompts', 500);
   }
 }
 
@@ -18,16 +20,16 @@ export async function POST(request: Request) {
     const { type, content } = await request.json();
 
     if (!type || !content) {
-      return NextResponse.json({ error: 'Type and content are required' }, { status: 400 });
+      return errorResponse('Type and content are required', 400);
     }
 
     const db = await getDatabase();
     await db.savePrompt({ type, content });
 
-    return NextResponse.json({ success: true });
+    return successResponse({ saved: true });
   } catch (error) {
     console.error('Error saving prompt:', error);
-    return NextResponse.json({ error: 'Failed to save prompt' }, { status: 500 });
+    return errorResponse('Failed to save prompt', 500);
   }
 }
 
@@ -37,15 +39,15 @@ export async function DELETE(request: Request) {
     const type = searchParams.get('type');
 
     if (!type) {
-      return NextResponse.json({ error: 'Type parameter is required' }, { status: 400 });
+      return errorResponse('Type parameter is required', 400);
     }
 
     const db = await getDatabase();
     await db.deletePrompt(type);
 
-    return NextResponse.json({ success: true });
+    return successResponse({ deleted: true });
   } catch (error) {
     console.error('Error deleting prompt:', error);
-    return NextResponse.json({ error: 'Failed to delete prompt' }, { status: 500 });
+    return errorResponse('Failed to delete prompt', 500);
   }
 }

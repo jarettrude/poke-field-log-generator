@@ -1,28 +1,27 @@
-/**
- * Client-side job management service for creating and controlling processing jobs.
- */
+import { ProcessingJob as DBProcessingJob } from '@/lib/db/adapter';
 
 const API_BASE = '/api/jobs';
 
 export type ProcessingStage = 'summary' | 'audio';
 export type JobStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'canceled';
 
-export interface ProcessingJob {
-  id: string;
-  status: JobStatus;
-  stage: ProcessingStage;
-  mode: 'FULL' | 'SUMMARY_ONLY' | 'AUDIO_ONLY';
-  generationId: number;
-  region: string;
-  voice: string;
-  pokemonIds: number[];
-  total: number;
-  current: number;
-  message: string;
-  cooldownUntil: string | null;
-  error: string | null;
-  createdAt: string;
-  updatedAt: string;
+// Re-export the type from the DB adapter to ensure consistency
+export type ProcessingJob = DBProcessingJob;
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
+  const result = (await response.json()) as ApiResponse<T>;
+  
+  if (!result.success || !result.data) {
+    throw new Error(result.error || 'Unknown API error');
+  }
+  
+  return result.data;
 }
 
 /**
@@ -41,12 +40,7 @@ export async function createJob(params: {
     body: JSON.stringify(params),
   });
 
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error || 'Failed to create job');
-  }
-
-  const data = (await response.json()) as { id: string };
+  const data = await handleResponse<{ id: string }>(response);
   return data.id;
 }
 
@@ -55,11 +49,7 @@ export async function createJob(params: {
  */
 export async function getJob(id: string): Promise<ProcessingJob> {
   const response = await fetch(`${API_BASE}/${id}`);
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error || 'Failed to fetch job');
-  }
-  return response.json();
+  return handleResponse<ProcessingJob>(response);
 }
 
 /**
@@ -67,10 +57,7 @@ export async function getJob(id: string): Promise<ProcessingJob> {
  */
 export async function pauseJob(id: string): Promise<void> {
   const response = await fetch(`${API_BASE}/${id}/pause`, { method: 'POST' });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error || 'Failed to pause job');
-  }
+  await handleResponse(response);
 }
 
 /**
@@ -78,10 +65,7 @@ export async function pauseJob(id: string): Promise<void> {
  */
 export async function resumeJob(id: string): Promise<void> {
   const response = await fetch(`${API_BASE}/${id}/resume`, { method: 'POST' });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error || 'Failed to resume job');
-  }
+  await handleResponse(response);
 }
 
 /**
@@ -89,8 +73,5 @@ export async function resumeJob(id: string): Promise<void> {
  */
 export async function cancelJob(id: string): Promise<void> {
   const response = await fetch(`${API_BASE}/${id}/cancel`, { method: 'POST' });
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: string } | null;
-    throw new Error(body?.error || 'Failed to cancel job');
-  }
+  await handleResponse(response);
 }

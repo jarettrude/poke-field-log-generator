@@ -108,32 +108,61 @@ function findSilenceCandidates(params: {
   return candidates;
 }
 
-function chooseSplitPoints(
+function chooseSplitPointsNearBoundaries(
   candidates: SilenceCandidate[],
   expectedSplits: number,
+  totalSamples: number,
   sampleRate: number
 ): number[] {
   if (expectedSplits <= 0) return [];
   if (candidates.length === 0) return [];
 
-  const scored = candidates
-    .map(c => ({
-      midSample: c.midSample,
-      score: c.durationSamples * 10 + Math.max(0, 1500 - c.minRms),
-    }))
-    .sort((a, b) => b.score - a.score);
+  // Calculate ideal split boundaries (evenly spaced)
+  const idealSpacing = totalSamples / (expectedSplits + 1);
+  const idealBoundaries: number[] = [];
+  for (let i = 1; i <= expectedSplits; i++) {
+    idealBoundaries.push(Math.floor(i * idealSpacing));
+  }
+
+  // Sort candidates by start time for efficient searching
+  const sortedCandidates = [...candidates].sort((a, b) => a.startSample - b.startSample);
 
   const selected: number[] = [];
-  const minDistanceSamples = Math.floor(sampleRate * 0.5);
+  const usedCandidates = new Set<number>();
+  const minDistanceSamples = Math.floor(sampleRate * 0.3); // 300ms minimum gap
 
-  for (const item of scored) {
-    if (selected.length >= expectedSplits) break;
-    const tooClose = selected.some(s => Math.abs(s - item.midSample) < minDistanceSamples);
-    if (!tooClose) selected.push(item.midSample);
+  // For each ideal boundary, find the best nearby unused silence
+  for (const idealPoint of idealBoundaries) {
+    // Find candidates near this boundary, prefer longer silences
+    const nearbyCandidates = sortedCandidates
+      .map((c, idx) => ({ candidate: c, idx, distance: Math.abs(c.midSample - idealPoint) }))
+      .filter(({ idx, distance }) => !usedCandidates.has(idx) && distance < idealSpacing * 0.8)
+      .sort((a, b) => {
+        // Prefer candidates closer to ideal point, then longer duration
+        const distanceWeight = 0.001; // Small weight for distance
+        return (a.distance * distanceWeight + 1 / a.candidate.durationSamples) -
+               (b.distance * distanceWeight + 1 / b.candidate.durationSamples);
+      });
+
+    let bestCandidate: { candidate: SilenceCandidate; idx: number } | null = null;
+
+    for (const { candidate, idx } of nearbyCandidates) {
+      // Check distance from already selected points
+      const tooClose = selected.some(s => Math.abs(s - candidate.midSample) < minDistanceSamples);
+      if (!tooClose) {
+        bestCandidate = { candidate, idx };
+        break;
+      }
+    }
+
+    if (bestCandidate) {
+      selected.push(bestCandidate.candidate.midSample);
+      usedCandidates.add(bestCandidate.idx);
+    }
   }
 
   selected.sort((a, b) => a - b);
-  return selected.slice(0, expectedSplits);
+  return selected;
 }
 
 function timeBasedSplitPoints(totalSamples: number, expectedSplits: number): number[] {
@@ -215,24 +244,24 @@ export function splitAudioBySilenceNode(
   const pass1 = findSilenceCandidates({
     samples,
     sampleRate,
-    minSilenceSeconds: 2.0,
+    minSilenceSeconds: 1.2,
     windowMs,
-    enterSilenceRms: 500,
-    exitSilenceRms: 800,
+    enterSilenceRms: 80,
+    exitSilenceRms: 150,
   });
 
-  let splitPoints = chooseSplitPoints(pass1, expectedSplits, sampleRate);
+  let splitPoints = chooseSplitPointsNearBoundaries(pass1, expectedSplits, samples.length, sampleRate);
 
   if (splitPoints.length < expectedSplits) {
     const pass2 = findSilenceCandidates({
       samples,
       sampleRate,
-      minSilenceSeconds: 1.5,
+      minSilenceSeconds: 0.8,
       windowMs,
-      enterSilenceRms: 350,
-      exitSilenceRms: 650,
+      enterSilenceRms: 50,
+      exitSilenceRms: 100,
     });
-    splitPoints = chooseSplitPoints(pass2, expectedSplits, sampleRate);
+    splitPoints = chooseSplitPointsNearBoundaries(pass2, expectedSplits, samples.length, sampleRate);
   }
 
   if (splitPoints.length < expectedSplits) {
@@ -243,8 +272,47 @@ export function splitAudioBySilenceNode(
 
   splitPoints = splitPoints.slice(0, expectedSplits).sort((a, b) => a - b);
 
+  // If we still don't have enough splits, use time-based to fill gaps
+  if (splitPoints.length < expectedSplits) {
+    const base = timeBasedSplitPoints(samples.length, expectedSplits);
+    const existing = new Set(splitPoints);
+    for (const point of base) {
+      if (splitPoints.length >= expectedSplits) break;
+      // Check if too close to existing
+      const tooClose = splitPoints.some(s => Math.abs(s - point) < sampleRate * 0.3);
+      if (!tooClose && !existing.has(point)) {
+        splitPoints.push(point);
+      }
+    }
+    splitPoints.sort((a, b) => a - b);
+  }
+
   const buffers = splitBufferBySamplePoints(pcmBuffer, splitPoints);
   const segments = buffers.map(bufferToPcmBase64);
+
+  // Guarantee exactly expectedCount segments
+  if (segments.length !== expectedCount) {
+    console.warn(
+      `Audio split produced ${segments.length} segments, expected ${expectedCount}. ` +
+      `Split points: ${splitPoints.length}`
+    );
+    // Pad with empty buffers or redistribute if needed
+    while (segments.length < expectedCount) {
+      segments.push(bufferToPcmBase64(Buffer.alloc(0)));
+    }
+    // Truncate if too many
+    while (segments.length > expectedCount) {
+      const last = segments.pop();
+      if (last && segments.length > 0) {
+        // Merge last two segments
+        const prev = segments[segments.length - 1];
+        if (prev) {
+          const merged = Buffer.concat([Buffer.from(prev, 'base64'), Buffer.from(last, 'base64')]);
+          segments[segments.length - 1] = merged.toString('base64');
+        }
+      }
+    }
+  }
 
   return { segments, count: segments.length };
 }

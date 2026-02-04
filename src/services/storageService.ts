@@ -5,6 +5,24 @@
 
 const API_BASE = '/api';
 
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+async function handleResponse<T>(response: Response): Promise<T> {
+  const result = (await response.json()) as ApiResponse<T>;
+  
+  // If explicitly failed or if data is missing when success is true (though data can be null for 404s logic below)
+  if (!result.success) {
+    throw new Error(result.error || 'Unknown API error');
+  }
+  
+  // Cast data as T (it might be undefined if the API returns void success response, but T should match)
+  return result.data as T;
+}
+
 /** Stored summary record returned by the backend API. */
 export interface StoredSummary {
   id: number;
@@ -64,10 +82,7 @@ export const saveSummary = async (summary: SummaryInput): Promise<void> => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(summary),
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to save summary');
-  }
+  await handleResponse(response);
 };
 
 /**
@@ -75,16 +90,17 @@ export const saveSummary = async (summary: SummaryInput): Promise<void> => {
  */
 export const getSummary = async (id: number): Promise<StoredSummary | null> => {
   const response = await fetch(`${API_BASE}/summaries/${id}`);
-
-  if (response.status === 404) {
-    return null;
+  
+  // The standardized API returns success: false, error: 'Summary not found' with 404
+  // We need to handle this specific case to return null as expected by the frontend
+  const result = (await response.json()) as ApiResponse<StoredSummary>;
+  
+  if (!result.success) {
+    if (response.status === 404) return null;
+    throw new Error(result.error || 'Failed to fetch summary');
   }
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch summary');
-  }
-
-  return response.json();
+  
+  return result.data || null;
 };
 
 /**
@@ -92,12 +108,7 @@ export const getSummary = async (id: number): Promise<StoredSummary | null> => {
  */
 export const getSummariesByGeneration = async (generationId: number): Promise<StoredSummary[]> => {
   const response = await fetch(`${API_BASE}/summaries?generationId=${generationId}`);
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch summaries');
-  }
-
-  return response.json();
+  return handleResponse<StoredSummary[]>(response);
 };
 
 /**
@@ -105,12 +116,7 @@ export const getSummariesByGeneration = async (generationId: number): Promise<St
  */
 export const getAllSummaries = async (): Promise<StoredSummary[]> => {
   const response = await fetch(`${API_BASE}/summaries`);
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch summaries');
-  }
-
-  return response.json();
+  return handleResponse<StoredSummary[]>(response);
 };
 
 /**
@@ -120,10 +126,7 @@ export const deleteSummary = async (id: number): Promise<void> => {
   const response = await fetch(`${API_BASE}/summaries/${id}`, {
     method: 'DELETE',
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to delete summary');
-  }
+  await handleResponse(response);
 };
 
 /**
@@ -158,10 +161,7 @@ export const saveAudioLog = async (audioLog: AudioLogInput): Promise<void> => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(audioLog),
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to save audio log');
-  }
+  await handleResponse(response);
 };
 
 /**
@@ -169,16 +169,15 @@ export const saveAudioLog = async (audioLog: AudioLogInput): Promise<void> => {
  */
 export const getAudioLog = async (id: number): Promise<StoredAudioLog | null> => {
   const response = await fetch(`${API_BASE}/audio/${id}`);
-
-  if (response.status === 404) {
-    return null;
+  
+  const result = (await response.json()) as ApiResponse<StoredAudioLog>;
+  
+  if (!result.success) {
+    if (response.status === 404) return null;
+    throw new Error(result.error || 'Failed to fetch audio log');
   }
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch audio log');
-  }
-
-  return response.json();
+  
+  return result.data || null;
 };
 
 /**
@@ -186,12 +185,7 @@ export const getAudioLog = async (id: number): Promise<StoredAudioLog | null> =>
  */
 export const getAudioLogsByGeneration = async (generationId: number): Promise<StoredAudioLog[]> => {
   const response = await fetch(`${API_BASE}/audio?generationId=${generationId}`);
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch audio logs');
-  }
-
-  return response.json();
+  return handleResponse<StoredAudioLog[]>(response);
 };
 
 /**
@@ -199,12 +193,7 @@ export const getAudioLogsByGeneration = async (generationId: number): Promise<St
  */
 export const getAllAudioLogs = async (): Promise<StoredAudioLog[]> => {
   const response = await fetch(`${API_BASE}/audio`);
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch audio logs');
-  }
-
-  return response.json();
+  return handleResponse<StoredAudioLog[]>(response);
 };
 
 /**
@@ -214,10 +203,7 @@ export const deleteAudioLog = async (id: number): Promise<void> => {
   const response = await fetch(`${API_BASE}/audio/${id}`, {
     method: 'DELETE',
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to delete audio log');
-  }
+  await handleResponse(response);
 };
 
 /**
@@ -229,10 +215,7 @@ export const deleteSummaries = async (ids: number[]): Promise<void> => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ids }),
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to delete summaries');
-  }
+  await handleResponse(response);
 };
 
 /**
@@ -244,8 +227,5 @@ export const deleteAudioLogs = async (ids: number[]): Promise<void> => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ids }),
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to delete audio logs');
-  }
+  await handleResponse(response);
 };

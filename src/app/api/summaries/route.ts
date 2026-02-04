@@ -1,25 +1,31 @@
-import { NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/db/adapter';
+import { successResponse, errorResponse } from '@/lib/server/api';
+
+export const runtime = 'nodejs';
 
 // GET /api/summaries - Get all summaries
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const generationId = searchParams.get('generationId');
+    const generationIdParam = searchParams.get('generationId');
 
     const db = await getDatabase();
 
     let summaries;
-    if (generationId) {
-      summaries = await db.getSummariesByGeneration(parseInt(generationId));
+    if (generationIdParam) {
+      const generationId = parseInt(generationIdParam, 10);
+      if (!Number.isFinite(generationId) || generationId <= 0) {
+        return errorResponse('Invalid generationId', 400);
+      }
+      summaries = await db.getSummariesByGeneration(generationId);
     } else {
       summaries = await db.getAllSummaries();
     }
 
-    return NextResponse.json(summaries);
+    return successResponse(summaries);
   } catch (error) {
     console.error('Error fetching summaries:', error);
-    return NextResponse.json({ error: 'Failed to fetch summaries' }, { status: 500 });
+    return errorResponse('Failed to fetch summaries', 500);
   }
 }
 
@@ -29,17 +35,23 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { id, name, summary, region, generationId } = body;
 
-    if (!id || !name || !summary || !region || !generationId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (
+      typeof id !== 'number' || id <= 0 ||
+      typeof name !== 'string' || !name ||
+      typeof summary !== 'string' || !summary ||
+      typeof region !== 'string' || !region ||
+      typeof generationId !== 'number' || generationId <= 0
+    ) {
+      return errorResponse('Missing or invalid required fields', 400);
     }
 
     const db = await getDatabase();
     await db.saveSummary({ id, name, summary, region, generationId });
 
-    return NextResponse.json({ success: true });
+    return successResponse({ saved: true });
   } catch (error) {
     console.error('Error saving summary:', error);
-    return NextResponse.json({ error: 'Failed to save summary' }, { status: 500 });
+    return errorResponse('Failed to save summary', 500);
   }
 }
 
@@ -47,20 +59,31 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const body = await request.json();
-    const { ids } = body as { ids: number[] };
+    const { ids } = body;
 
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return NextResponse.json({ error: 'Missing or invalid ids array' }, { status: 400 });
+    if (!Array.isArray(ids)) {
+      return errorResponse('Missing or invalid ids array', 400);
+    }
+
+    const uniqueIds = Array.from(new Set(
+      ids
+        .map(id => Number(id))
+        .filter(id => Number.isFinite(id) && id > 0)
+        .map(id => Math.trunc(id))
+    ));
+
+    if (uniqueIds.length === 0) {
+      return errorResponse('No valid IDs provided', 400);
     }
 
     const db = await getDatabase();
-    for (const id of ids) {
+    for (const id of uniqueIds) {
       await db.deleteSummary(id);
     }
 
-    return NextResponse.json({ success: true, deleted: ids.length });
+    return successResponse({ deleted: uniqueIds.length });
   } catch (error) {
     console.error('Error deleting summaries:', error);
-    return NextResponse.json({ error: 'Failed to delete summaries' }, { status: 500 });
+    return errorResponse('Failed to delete summaries', 500);
   }
 }

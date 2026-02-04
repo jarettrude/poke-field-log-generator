@@ -114,9 +114,29 @@ export async function generateSummary(details: PokemonDetails, region: string): 
       },
     });
 
-    const text = response.text || '{}';
-    const parsed = JSON.parse(text) as { summary?: string };
-    return parsed.summary || '';
+    // Handle potential SDK variations or empty responses
+    let text = response.text;
+    if (!text) {
+      // Check for candidates to provide better error details (e.g., safety blocking)
+      const candidate = response.candidates?.[0];
+      if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
+        throw new Error(`Gemini generation stopped: ${candidate.finishReason}`);
+      }
+      text = '{}';
+    }
+
+    let parsed: { summary?: string };
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      throw new Error(`Failed to parse Gemini response: ${text.substring(0, 100)}...`);
+    }
+
+    if (!parsed.summary) {
+      throw new Error('Gemini returned valid JSON but missing "summary" field.');
+    }
+
+    return parsed.summary;
   }, MAX_RETRIES);
 }
 
@@ -136,7 +156,7 @@ export async function generateTts(params: {
     const baseInstruction = await getActivePrompt('tts');
 
     const bulkInstruction = params.isBulk
-      ? "\n\nCRITICAL: Multiple entries provided. Pause for exactly 3 seconds at every '[PAUSE]' marker. Maintain consistent tone and pacing throughout."
+      ? "\n\nCRITICAL - PAUSE PROTOCOL: Multiple entries follow. At each '[PAUSE]' marker: STOP speaking completely, wait silently for exactly 3 seconds with no sound whatsoever, then begin the next entry cleanly. Do NOT trail off, mumble through, or start the next entry during the pause. Maintain consistent tone throughout all entries."
       : '';
 
     const response = await ai.models.generateContent({

@@ -161,6 +161,7 @@ export interface DatabaseAdapter {
   cancelJob(id: string): Promise<void>;
   pauseJob(id: string): Promise<void>;
   resumeJob(id: string): Promise<void>;
+  recoverStalledJobs(stalledThresholdMs: number): Promise<number>;
 
   // Initialization
   initialize(): Promise<void>;

@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/db/adapter';
+import { successResponse, errorResponse } from '@/lib/server/api';
+
+export const runtime = 'nodejs';
 
 interface RouteParams {
   params: Promise<{ type: string }>;
@@ -12,12 +14,12 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const prompt = await db.getPrompt(type);
 
     if (!prompt) {
-      return NextResponse.json(null);
+      return successResponse(null);
     }
 
-    return NextResponse.json(prompt);
+    return successResponse(prompt);
   } catch (error) {
     console.error('Error fetching prompt:', error);
-    return NextResponse.json({ error: 'Failed to fetch prompt' }, { status: 500 });
+    return errorResponse('Failed to fetch prompt', 500);
   }
 }

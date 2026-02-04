@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/db/adapter';
 import { startJobRunner } from '@/lib/server/jobRunner';
+import { successResponse, errorResponse } from '@/lib/server/api';
 
 export const runtime = 'nodejs';
 
@@ -15,15 +15,15 @@ export async function POST(_request: Request, { params }: RouteParams) {
     const db = await getDatabase();
 
     const job = await db.getJob(id);
-    if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    if (!job) return errorResponse('Job not found', 404);
 
     await db.cancelJob(id);
     await db.setJobCooldownUntil(id, null);
     await db.setJobProgress(id, job.stage, job.current, job.total, 'Canceled');
 
-    return NextResponse.json({ success: true });
+    return successResponse({ canceled: true });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return errorResponse(msg, 500);
   }
 }

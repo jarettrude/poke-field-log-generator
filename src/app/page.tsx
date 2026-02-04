@@ -1,23 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 
-import {
-  fetchGenerations,
-  fetchPokemonInGeneration,
-  fetchGenerationWithRegion,
-} from '@/services/pokeService';
-import { createJob, getJob, pauseJob, resumeJob, cancelJob } from '@/services/jobsService';
-import {
-  getSummariesByGeneration,
-  getAllSummaries,
-  StoredSummary,
-  getAllAudioLogs,
-  getAudioLogsByGeneration,
-  StoredAudioLog,
-  deleteSummaries,
-  deleteAudioLogs,
-} from '@/services/storageService';
+import { createJob, pauseJob, resumeJob, cancelJob } from '@/services/jobsService';
+import { deleteSummaries, deleteAudioLogs } from '@/services/storageService';
 
 import {
   Header,
@@ -32,180 +18,66 @@ import {
   ThemeProvider,
 } from '@/components';
 
-import {
-  Generation,
-  PokemonBaseInfo,
-  ProcessedPokemon,
-  WorkflowMode,
-  AppView,
-  CooldownState,
-} from '@/types';
+import { ProcessedPokemon, WorkflowMode, AppView } from '@/types';
+import { useJobPolling } from '@/hooks/useJobPolling';
+import { usePokemonData } from '@/hooks/usePokemonData';
+import { useSavedData } from '@/hooks/useSavedData';
 
 function HomeInner() {
   const { showToast } = useToast();
 
   const [currentView, setCurrentView] = useState<AppView>(AppView.HOME);
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode>(WorkflowMode.FULL);
-  const [generations, setGenerations] = useState<Generation[]>([]);
-  const [selectedGenId, setSelectedGenId] = useState<number>(1);
-  const [currentRegion, setCurrentRegion] = useState<string>('Kanto');
-  const [pokemonList, setPokemonList] = useState<PokemonBaseInfo[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [rangeStart, setRangeStart] = useState<number>(1);
-  const [rangeEnd, setRangeEnd] = useState<number>(151);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectedVoice, setSelectedVoice] = useState('Kore');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [progress, setProgress] = useState<{
-    current: number;
-    total: number;
-    message: string;
-    stage: 'summary' | 'audio';
-  }>({ current: 0, total: 0, message: '', stage: 'summary' });
-  const [cooldown, setCooldown] = useState<CooldownState | null>(null);
   const [currentSummary, setCurrentSummary] = useState<string | null>(null);
   const [results, setResults] = useState<ProcessedPokemon[]>([]);
-  const [savedSummaries, setSavedSummaries] = useState<StoredSummary[]>([]);
-  const [savedAudioLogs, setSavedAudioLogs] = useState<StoredAudioLog[]>([]);
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const pollTimer = useRef<number | null>(null);
 
-  useEffect(() => {
-    const init = async () => {
-      const gens = await fetchGenerations();
-      setGenerations(gens);
-      if (gens.length > 0 && gens[0]?.id) {
-        handleGenChange(gens[0].id);
+  // Custom Hooks
+  const {
+    generations,
+    selectedGenId,
+    currentRegion,
+    pokemonList,
+    isLoading,
+    rangeStart,
+    rangeEnd,
+    setRangeStart,
+    setRangeEnd,
+    handleGenChange,
+  } = usePokemonData();
+
+  const {
+    savedSummaries,
+    savedAudioLogs,
+    refreshData: refreshSavedData,
+  } = useSavedData();
+
+  const {
+    activeJobId,
+    setActiveJobId,
+    isProcessing,
+    isPaused,
+    progress,
+    cooldown,
+    setIsProcessing,
+    setCooldown,
+  } = useJobPolling({
+    onJobComplete: (jobResults, mode) => {
+      refreshSavedData();
+
+      if (mode === 'SUMMARY_ONLY') {
+        setCurrentView(AppView.POKEDEX_LIBRARY);
+      } else {
+        setResults(jobResults);
+        setCurrentView(AppView.RESULTS);
       }
-      await loadSavedSummaries();
-      await loadSavedAudioLogs();
-    };
-    init();
-  }, []);
-
-  useEffect(() => {
-    const clearPoll = () => {
-      if (pollTimer.current) {
-        window.clearInterval(pollTimer.current);
-        pollTimer.current = null;
-      }
-    };
-
-    if (!activeJobId) {
-      clearPoll();
-      return;
-    }
-
-    const poll = async () => {
-      try {
-        const job = await getJob(activeJobId);
-
-        setIsProcessing(
-          job.status === 'queued' || job.status === 'running' || job.status === 'paused'
-        );
-        setIsPaused(job.status === 'paused');
-
-        setProgress({
-          current: job.current,
-          total: job.total,
-          message: job.message,
-          stage: job.stage,
-        });
-
-        if (job.cooldownUntil) {
-          const remainingMs = Math.max(0, new Date(job.cooldownUntil).getTime() - Date.now());
-          if (remainingMs > 0) {
-            setCooldown({ active: true, remainingMs, flavorText: '' });
-          } else {
-            setCooldown(null);
-          }
-        } else {
-          setCooldown(null);
-        }
-
-        if (job.status === 'failed') {
-          clearPoll();
-          setActiveJobId(null);
-          setIsProcessing(false);
-          setCooldown(null);
-          showToast({
-            variant: 'error',
-            title: 'Job failed',
-            description: job.error || 'Something went wrong while processing your batch.',
-            durationMs: 6500,
-          });
-        }
-
-        if (job.status === 'canceled') {
-          clearPoll();
-          setActiveJobId(null);
-          setIsProcessing(false);
-          setCooldown(null);
-        }
-
-        if (job.status === 'completed') {
-          clearPoll();
-          setActiveJobId(null);
-          setIsProcessing(false);
-          setCooldown(null);
-
-          await loadSavedSummaries();
-          await loadSavedAudioLogs();
-
-          if (job.mode === 'SUMMARY_ONLY') {
-            setCurrentView(AppView.POKEDEX_LIBRARY);
-            return;
-          }
-
-          const resultsForJob = await buildResultsForJob(job);
-          setResults(resultsForJob);
-          setCurrentView(AppView.RESULTS);
-        }
-      } catch (e) {
-        console.error('Failed to poll job:', e);
-      }
-    };
-
-    void poll();
-    pollTimer.current = window.setInterval(poll, 1000);
-
-    return () => {
-      clearPoll();
-    };
-  }, [activeJobId, showToast]);
-
-  const loadSavedSummaries = async () => {
-    const summaries = await getAllSummaries();
-    setSavedSummaries(summaries);
-  };
-
-  const loadSavedAudioLogs = async () => {
-    const audioLogs = await getAllAudioLogs();
-    setSavedAudioLogs(audioLogs);
-  };
-
-  const handleGenChange = async (genId: number) => {
-    setSelectedGenId(genId);
-    setIsLoading(true);
-    try {
-      const [list, genInfo] = await Promise.all([
-        fetchPokemonInGeneration(genId),
-        fetchGenerationWithRegion(genId),
-      ]);
-      setPokemonList(list);
-      setCurrentRegion(genInfo.region);
-      setSearchQuery('');
-      if (list.length > 0) {
-        const ids = list.map(p => p.id);
-        setRangeStart(Math.min(...ids));
-        setRangeEnd(Math.max(...ids));
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    onJobCanceled: () => {
+      setCurrentView(AppView.HOME);
+    },
+  });
 
   const handleSelectMode = (mode: WorkflowMode) => {
     setWorkflowMode(mode);
@@ -217,43 +89,6 @@ function HomeInner() {
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelectedIds(next);
-  };
-
-  const buildResultsForJob = async (job: {
-    generationId: number;
-    pokemonIds: number[];
-  }): Promise<ProcessedPokemon[]> => {
-    const [summaries, audioLogs] = await Promise.all([
-      getSummariesByGeneration(job.generationId),
-      getAudioLogsByGeneration(job.generationId),
-    ]);
-
-    const summaryById = new Map(summaries.map(s => [s.id, s] as const));
-    const audioById = new Map(audioLogs.map(a => [a.id, a] as const));
-
-    const results: ProcessedPokemon[] = [];
-    for (const id of job.pokemonIds) {
-      const summary = summaryById.get(id);
-      const audio = audioById.get(id);
-      if (!summary || !audio) continue;
-
-      const cachedPokemonRes = await fetch(`/api/pokemon/${id}`);
-      const cachedPokemon = (await cachedPokemonRes.json().catch(() => null)) as {
-        imagePngPath?: string | null;
-        imageSvgPath?: string | null;
-      } | null;
-
-      results.push({
-        id,
-        name: summary.name,
-        summary: summary.summary,
-        audioData: audio.audioBase64,
-        pngData: cachedPokemon?.imagePngPath || null,
-        svgData: cachedPokemon?.imageSvgPath || null,
-      });
-    }
-
-    return results;
   };
 
   const handleStartProcess = async () => {
@@ -291,7 +126,6 @@ function HomeInner() {
 
     setIsProcessing(true);
     setCurrentSummary(null);
-    setProgress({ current: 0, total: 0, message: 'Queued...', stage: 'summary' });
     setCurrentView(AppView.PROCESSING);
 
     const mode =
@@ -384,15 +218,14 @@ function HomeInner() {
           <PokedexLibraryView
             summaries={savedSummaries}
             audioLogs={savedAudioLogs}
-            onRefresh={async () => {
-              await loadSavedSummaries();
-              await loadSavedAudioLogs();
-            }}
+            onRefresh={refreshSavedData}
             onDeleteSummaries={async (ids: number[]) => {
               await deleteSummaries(ids);
+              await refreshSavedData();
             }}
             onDeleteAudio={async (ids: number[]) => {
               await deleteAudioLogs(ids);
+              await refreshSavedData();
             }}
           />
         )}

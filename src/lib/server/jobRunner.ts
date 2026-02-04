@@ -291,10 +291,24 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
 
     const split = splitAudioBySilenceNode(audioData, batch.length, SERVER_TTS_SAMPLE_RATE);
 
+    // Validate split results - must have expected number of segments
+    if (split.segments.length !== batch.length) {
+      console.warn(
+        `Audio split mismatch for batch: expected ${batch.length} segments, got ${split.segments.length}. ` +
+        `Split points found: ${split.segments.length - 1}. Falling back to equal division.`
+      );
+    }
+
     for (let j = 0; j < batch.length; j++) {
       const summary = batch[j];
       if (!summary) continue;
-      const segment = split.segments[j] || audioData;
+      
+      // Use segment if available, otherwise create empty placeholder
+      const segment = split.segments[j];
+      if (!segment) {
+        console.error(`Missing audio segment for ${summary.name} (#${summary.id})`);
+        continue; // Skip saving incomplete audio instead of using full audio
+      }
 
       await db.saveAudioLog({
         id: summary.id,
@@ -438,9 +452,31 @@ async function tick(): Promise<void> {
   activeJobs.set(job.id, jobPromise);
 }
 
+const STALLED_JOB_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
+async function checkStalledJobs(): Promise<void> {
+  try {
+    const db = await getDatabase();
+    const recoveredCount = await db.recoverStalledJobs(STALLED_JOB_THRESHOLD_MS);
+    if (recoveredCount > 0) {
+      console.log(`Recovered ${recoveredCount} stalled jobs.`);
+    }
+  } catch (error) {
+    console.error('Failed to recover stalled jobs:', error);
+  }
+}
+
 export function startJobRunner(): void {
   if (runnerStarted) return;
   runnerStarted = true;
+
+  // Initial recovery of stalled jobs
+  void checkStalledJobs();
+
+  // Periodic stalled job check
+  setInterval(() => {
+    void checkStalledJobs();
+  }, 60000);
 
   setInterval(() => {
     void tick();

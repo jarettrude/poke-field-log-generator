@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/db/adapter';
 import fs from 'fs/promises';
 import path from 'path';
+import { successResponse, errorResponse, parseId } from '@/lib/server/api';
+
+export const runtime = 'nodejs';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -18,23 +20,38 @@ const POKEMON_IMAGE_DIR = path.join(process.cwd(), 'public', 'pokemon');
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const pokemonId = Number.parseInt(id, 10);
-    if (!Number.isFinite(pokemonId) || pokemonId <= 0) {
-      return NextResponse.json({ error: 'Invalid Pokémon id' }, { status: 400 });
+    const pokemonId = parseId(id);
+    if (!pokemonId) {
+      return errorResponse('Invalid Pokémon id', 400);
     }
 
     const db = await getDatabase();
     const cached = await db.getCachedPokemon(pokemonId);
 
     if (cached) {
-      return NextResponse.json(cached);
+      return successResponse(cached);
     }
 
     // Not cached, return null to signal frontend should fetch from PokeAPI
-    return NextResponse.json(null);
+    return successResponse(null);
   } catch (error) {
     console.error('Error fetching cached pokemon:', error);
-    return NextResponse.json({ error: 'Failed to fetch pokemon' }, { status: 500 });
+    return errorResponse('Failed to fetch pokemon', 500);
+  }
+}
+
+async function downloadImage(url: string | null, filename: string): Promise<string | null> {
+  if (!url) return null;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    
+    const buffer = await response.arrayBuffer();
+    await fs.writeFile(path.join(POKEMON_IMAGE_DIR, filename), Buffer.from(buffer));
+    return `/pokemon/${filename}`;
+  } catch (e) {
+    console.warn(`Failed to download image from ${url}:`, e);
+    return null;
   }
 }
 
@@ -47,9 +64,9 @@ export async function GET(_request: Request, { params }: RouteParams) {
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const { id } = await params;
-    const pokemonId = Number.parseInt(id, 10);
-    if (!Number.isFinite(pokemonId) || pokemonId <= 0) {
-      return NextResponse.json({ error: 'Invalid Pokémon id' }, { status: 400 });
+    const pokemonId = parseId(id);
+    if (!pokemonId) {
+      return errorResponse('Invalid Pokémon id', 400);
     }
 
     const body = await request.json();
@@ -75,43 +92,17 @@ export async function POST(request: Request, { params }: RouteParams) {
       !Array.isArray(flavorTexts) ||
       !Array.isArray(moveNames)
     ) {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      return errorResponse('Invalid request body', 400);
     }
-
-    // Download and save images to public/pokemon/
-    let imagePngPath: string | null = null;
-    let imageSvgPath: string | null = null;
 
     // Ensure directory exists
     await fs.mkdir(POKEMON_IMAGE_DIR, { recursive: true });
 
-    if (imagePngUrl) {
-      try {
-        const response = await fetch(imagePngUrl);
-        if (response.ok) {
-          const buffer = await response.arrayBuffer();
-          const filename = `${pokemonId}.png`;
-          await fs.writeFile(path.join(POKEMON_IMAGE_DIR, filename), Buffer.from(buffer));
-          imagePngPath = `/pokemon/${filename}`;
-        }
-      } catch (e) {
-        console.warn(`Failed to download PNG for pokemon ${pokemonId}:`, e);
-      }
-    }
-
-    if (imageSvgUrl) {
-      try {
-        const response = await fetch(imageSvgUrl);
-        if (response.ok) {
-          const svgContent = await response.text();
-          const filename = `${pokemonId}.svg`;
-          await fs.writeFile(path.join(POKEMON_IMAGE_DIR, filename), svgContent);
-          imageSvgPath = `/pokemon/${filename}`;
-        }
-      } catch (e) {
-        console.warn(`Failed to download SVG for pokemon ${pokemonId}:`, e);
-      }
-    }
+    // Parallelize downloads
+    const [imagePngPath, imageSvgPath] = await Promise.all([
+      downloadImage(imagePngUrl, `${pokemonId}.png`),
+      downloadImage(imageSvgUrl, `${pokemonId}.svg`),
+    ]);
 
     const db = await getDatabase();
     await db.cachePokemon({
@@ -127,13 +118,13 @@ export async function POST(request: Request, { params }: RouteParams) {
       imageSvgPath,
     });
 
-    return NextResponse.json({
-      success: true,
+    return successResponse({
+      saved: true,
       imagePngPath,
       imageSvgPath,
     });
   } catch (error) {
     console.error('Error caching pokemon:', error);
-    return NextResponse.json({ error: 'Failed to cache pokemon' }, { status: 500 });
+    return errorResponse('Failed to cache pokemon', 500);
   }
 }

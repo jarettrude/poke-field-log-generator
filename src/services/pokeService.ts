@@ -107,6 +107,35 @@ export const fetchPokemonInGeneration = async (genId: number): Promise<PokemonBa
   return pokemonList;
 };
 
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+async function handleResponse<T>(response: Response): Promise<T | null> {
+  const result = (await response.json()) as ApiResponse<T>;
+  
+  if (!result.success) {
+    throw new Error(result.error || 'Unknown API error');
+  }
+  
+  return result.data ?? null;
+}
+
+interface CachedPokemonResponse {
+  id: number;
+  name: string;
+  height: number;
+  weight: number;
+  types: string[];
+  habitat: string;
+  flavorTexts: string[];
+  moveNames: string[];
+  imagePngPath: string | null;
+  imageSvgPath: string | null;
+}
+
 /**
  * Fetch detailed Pokémon data.
  *
@@ -117,7 +146,7 @@ export const fetchPokemonInGeneration = async (genId: number): Promise<PokemonBa
 export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> => {
   // First check if cached in database
   const cachedResponse = await fetch(`${API_BASE}/pokemon/${id}`);
-  const cachedData = await cachedResponse.json();
+  const cachedData = await handleResponse<CachedPokemonResponse>(cachedResponse);
 
   if (cachedData) {
     // Return cached data with local image paths
@@ -150,7 +179,7 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
   const imageSvgUrl = pokemonData.sprites.other.dream_world.front_default;
 
   // Cache to database (images will be downloaded by backend)
-  await fetch(`${API_BASE}/pokemon/${id}`, {
+  const saveResponse = await fetch(`${API_BASE}/pokemon/${id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -165,11 +194,14 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
       imageSvgUrl,
     }),
   });
+  
+  await handleResponse(saveResponse);
 
   // Fetch again to get local image paths
   const freshCached = await fetch(`${API_BASE}/pokemon/${id}`);
-  const freshData = await freshCached.json();
+  const freshData = await handleResponse<CachedPokemonResponse>(freshCached);
 
+  // Fallback to URL if freshData is null (shouldn't happen after save, but for safety)
   return {
     id: pokemonData.id,
     name: pokemonData.name,
