@@ -1,6 +1,6 @@
-# PokeAPI Data Structure & Prompt Usage
+# Data Processing and Prompt Engineering
 
-This document outlines the data structure returned from PokeAPI and how the prompt system uses this data to generate immersive field researcher logs.
+This document details the data structures, processing pipeline, and prompt engineering techniques used to generate immersive Pokemon field researcher logs.
 
 ## PokeAPI Data Structure
 
@@ -147,9 +147,9 @@ const pokemonContext = `
 - **Format**: Bolded in output (`**Flamethrower**`)
 - **Example**: "I witnessed it unleash a devastating **Flame Wheel**"
 
-### TTS (Text-to-Speech) Prompt
+### Text-to-Speech Prompt
 
-The TTS prompt uses the generated summary text and adds director's notes for voice styling. Audio is generated using Gemini 2.5 Flash Preview TTS with selectable voice profiles (Kore, Zephyr, Charon, Puck, Fenrir).
+The TTS prompt uses the generated summary text and adds director's notes for voice styling. Audio is generated using Gemini TTS with selectable voice profiles (Kore, Zephyr, Charon, Puck, Fenrir).
 
 ```typescript
 const baseInstruction = `
@@ -292,52 +292,20 @@ CREATE TABLE jobs (
 );
 ```
 
-## API Endpoints
+## API Integration
 
-### Job Management
-- **POST** `/api/jobs` - Create a new processing job
-- **GET** `/api/jobs/{id}` - Get job status and progress
-- **POST** `/api/jobs/{id}/pause` - Pause a running job
-- **POST** `/api/jobs/{id}/resume` - Resume a paused job
-- **POST** `/api/jobs/{id}/cancel` - Cancel a job
-
-### Prompt Management
-- **GET** `/api/prompts` - Get all stored prompts
-- **POST** `/api/prompts` - Save/update a prompt
-- **DELETE** `/api/prompts?type={type}` - Delete a specific prompt
-- **GET** `/api/prompts/{type}` - Get a specific prompt
-
-### Pokemon Data
-- **GET** `/api/pokemon/{id}` - Get cached Pokemon data
-- **POST** `/api/pokemon/{id}` - Cache Pokemon data (downloads sprites)
-
-### Summaries
-- **GET** `/api/summaries` - Get all summaries (optional `?generationId=N`)
-- **POST** `/api/summaries` - Save a summary
-- **GET** `/api/summaries/{id}` - Get a specific summary
-- **DELETE** `/api/summaries/{id}` - Delete a summary
-
-### Audio Logs
-- **GET** `/api/audio` - Get all audio logs (optional `?generationId=N`)
-- **POST** `/api/audio` - Save an audio log
-- **GET** `/api/audio/{id}` - Get a specific audio log
-- **DELETE** `/api/audio/{id}` - Delete an audio log
+For complete API endpoint documentation, see [API Reference](./api-reference.md).
 
 ## Job-Based Processing
 
-The application uses a background job runner for processing:
+The application uses a background job runner for processing long-running AI operations:
 
-1. **Client** creates a job via `POST /api/jobs` with mode, generation, voice, and Pokemon IDs
-2. **Job Runner** (`lib/server/jobRunner.ts`) polls for queued jobs every second
-3. **Processing** happens server-side with cooldowns between API calls:
-   - Summary generation: 15s cooldown between each Pokemon
-   - TTS generation: 5min cooldown between batches (up to 15 summaries per batch)
-4. **Progress** is tracked in the database; client polls `GET /api/jobs/{id}` for updates
+1. **Client** creates a job with mode, generation, voice, and Pokemon IDs
+2. **Job Runner** polls for queued jobs and processes them server-side
+3. **Processing** happens with enforced cooldowns between API calls:
+   - Summary generation: 15-second cooldown between each Pokemon
+   - TTS generation: 5-minute cooldown between batches (up to 15 summaries per batch)
+4. **Progress** is tracked in the database with real-time status updates
 5. **Controls**: Jobs can be paused, resumed, or canceled at any time
 
-This architecture provides:
-- **Consistent Storage**: All data in one SQLite database with WAL mode
-- **Background Processing**: Long-running jobs don't block the UI
-- **Rate Limit Compliance**: Server-enforced cooldowns prevent API throttling
-- **Job Control**: Pause/resume/cancel for user flexibility
-- **Progress Tracking**: Real-time status updates via polling
+For detailed architecture information, see [Technical Documentation](./technical-documentation.md).
