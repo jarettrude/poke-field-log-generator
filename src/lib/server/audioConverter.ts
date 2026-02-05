@@ -26,6 +26,15 @@ export async function convertPcmToMp3(
   return new Promise((resolve, reject) => {
     const pcmBuffer = Buffer.from(pcmBase64, 'base64');
 
+    if (pcmBuffer.length === 0) {
+      reject(new Error('PCM input buffer is empty (0 bytes). TTS response may have been invalid.'));
+      return;
+    }
+
+    console.log(
+      `[audioConverter] Converting PCM→MP3: ${pcmBuffer.length} bytes, ${sampleRate}Hz, ${bitrate}kbps`
+    );
+
     const ffmpeg = spawn(ffmpegPath as string, [
       '-f',
       's16le',

@@ -219,12 +219,17 @@ export async function generateTts(params: { text: string; voiceName: string }): 
       },
     });
 
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) {
+    const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+    if (!inlineData?.data) {
       throw new Error('Voice engine failed to respond with data.');
     }
 
-    return base64Audio;
+    const mimeType = inlineData.mimeType ?? 'unknown';
+    if (mimeType !== 'unknown' && !mimeType.startsWith('audio/L16') && !mimeType.startsWith('audio/pcm')) {
+      console.warn(`Unexpected TTS mimeType: ${mimeType}. Expected audio/L16 or audio/pcm.`);
+    }
+
+    return inlineData.data;
   };
 
   try {
