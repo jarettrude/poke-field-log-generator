@@ -26,7 +26,7 @@ export async function convertPcmToMp3(
   return new Promise((resolve, reject) => {
     const pcmBuffer = Buffer.from(pcmBase64, 'base64');
 
-    const ffmpeg = spawn(ffmpegPath, [
+    const ffmpeg = spawn(ffmpegPath as string, [
       '-f',
       's16le',
       '-ar',
@@ -46,15 +46,15 @@ export async function convertPcmToMp3(
     const chunks: Buffer[] = [];
     const errorChunks: Buffer[] = [];
 
-    ffmpeg.stdout.on('data', chunk => {
+    ffmpeg.stdout.on('data', (chunk: Buffer) => {
       chunks.push(chunk);
     });
 
-    ffmpeg.stderr.on('data', chunk => {
+    ffmpeg.stderr.on('data', (chunk: Buffer) => {
       errorChunks.push(chunk);
     });
 
-    ffmpeg.on('close', code => {
+    ffmpeg.on('close', (code: number | null) => {
       if (code === 0) {
         const mp3Buffer = Buffer.concat(chunks);
         const mp3Base64 = mp3Buffer.toString('base64');
@@ -65,7 +65,7 @@ export async function convertPcmToMp3(
       }
     });
 
-    ffmpeg.on('error', error => {
+    ffmpeg.on('error', (error: Error) => {
       reject(new Error(`FFmpeg process error: ${error.message}`));
     });
 

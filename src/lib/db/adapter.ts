@@ -20,8 +20,8 @@ export interface StoredAudioLog {
   generationId: number;
   voice: string;
   audioBase64: string;
-  audioFormat: 'pcm_s16le' | 'wav';
-  sampleRate: number;
+  audioFormat: 'mp3';
+  bitrate: number;
   createdAt: string;
   updatedAt: string;
 }

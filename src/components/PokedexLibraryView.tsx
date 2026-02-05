@@ -265,7 +265,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         existing.audioMeta = {
           voice: a.voice,
           audioFormat: a.audioFormat,
-          sampleRate: a.sampleRate,
+          bitrate: a.bitrate,
         };
       } else {
         entryMap.set(a.id, {
@@ -277,7 +277,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           audioMeta: {
             voice: a.voice,
             audioFormat: a.audioFormat,
-            sampleRate: a.sampleRate,
+            bitrate: a.bitrate,
           },
         });
       }
