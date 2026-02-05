@@ -21,7 +21,8 @@ export const SERVER_SUMMARY_COOLDOWN_MS = 15000;
 export const SERVER_TTS_COOLDOWN_MS = 300000;
 
 export const SERVER_TTS_SAMPLE_RATE = 24000;
-export const SERVER_TTS_AUDIO_FORMAT = 'pcm_s16le' as const;
+export const SERVER_TTS_AUDIO_FORMAT = 'mp3' as const;
+export const SERVER_TTS_MP3_BITRATE = 128;
 
 /**
  * Add jitter to a cooldown duration to smooth traffic and prevent thundering herd.

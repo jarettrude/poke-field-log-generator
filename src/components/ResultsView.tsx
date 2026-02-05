@@ -2,7 +2,7 @@ import React from 'react';
 import Image from 'next/image';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { ProcessedPokemon } from '../types';
-import { pcmToWav } from '../services/audioUtils';
+import { mp3ToUrl } from '../services/audioUtils';
 import { POKEBALL_IMAGE } from '../constants';
 import { formatPokemonId } from '../utils/pokemonUtils';
 
@@ -53,7 +53,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ results, onClear, onBa
               </div>
             </div>
             <p className="mb-4 line-clamp-2 text-sm leading-relaxed text-slate-500">{r.summary}</p>
-            <audio controls className="h-8 w-full" src={pcmToWav(r.audioData)} />
+            <audio controls className="h-8 w-full" src={mp3ToUrl(r.audioData)} />
           </div>
         ))}
       </div>

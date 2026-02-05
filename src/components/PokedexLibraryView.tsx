@@ -25,7 +25,7 @@ import {
   saveSummary,
 } from '../services/storageService';
 import { formatPokemonId } from '../utils/pokemonUtils';
-import { pcmToWav } from '../services/audioUtils';
+import { mp3ToUrl } from '../services/audioUtils';
 import JSZip from 'jszip';
 
 interface PokedexEntry {
@@ -37,8 +37,8 @@ interface PokedexEntry {
   hasAudio: boolean;
   audioMeta?: {
     voice: string;
-    audioFormat: 'pcm_s16le' | 'wav';
-    sampleRate: number;
+    audioFormat: 'mp3';
+    bitrate: number;
   };
   imagePngPath?: string | null;
   imageSvgPath?: string | null;
@@ -48,12 +48,12 @@ interface LazyAudioPlayerProps {
   pokemonId: number;
   audioMeta: {
     voice: string;
-    audioFormat: 'pcm_s16le' | 'wav';
-    sampleRate: number;
+    audioFormat: 'mp3';
+    bitrate: number;
   };
 }
 
-const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId, audioMeta }) => {
+const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId }) => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -75,8 +75,8 @@ const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId, audioMeta 
         setError('Audio not found');
         return;
       }
-      const wavUrl = pcmToWav(audioLog.audioBase64, audioMeta.sampleRate);
-      setAudioUrl(wavUrl);
+      const mp3Url = mp3ToUrl(audioLog.audioBase64);
+      setAudioUrl(mp3Url);
       // Play after state update via useEffect
     } catch (e) {
       setError('Failed to load audio');
@@ -84,7 +84,7 @@ const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId, audioMeta 
     } finally {
       setIsLoading(false);
     }
-  }, [pokemonId, audioMeta.sampleRate, audioUrl]);
+  }, [pokemonId, audioUrl]);
 
   useEffect(() => {
     if (audioUrl && audioRef.current) {
@@ -529,10 +529,8 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         try {
           const audioLog = await getAudioLog(entry.id);
           if (audioLog) {
-            const audioBlob = await fetch(
-              pcmToWav(audioLog.audioBase64, entry.audioMeta.sampleRate)
-            ).then(res => res.blob());
-            folder.file(`${filePrefix}.wav`, audioBlob);
+            const audioBlob = await fetch(mp3ToUrl(audioLog.audioBase64)).then(res => res.blob());
+            folder.file(`${filePrefix}.mp3`, audioBlob);
           }
         } catch (e) {
           console.warn(`Failed to fetch audio for ${entry.name}:`, e);

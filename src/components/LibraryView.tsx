@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { StoredSummary, StoredAudioLog } from '../services/storageService';
 import { formatPokemonId } from '../utils/pokemonUtils';
-import { pcmToWav } from '../services/audioUtils';
+import { mp3ToUrl } from '../services/audioUtils';
 
 interface LibraryViewProps {
   summaries: StoredSummary[];
@@ -407,14 +407,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <span className="rounded bg-slate-100 px-2 py-1">Voice: {audioLog.voice}</span>
                   <span className="rounded bg-slate-100 px-2 py-1">
-                    {audioLog.audioFormat} @ {audioLog.sampleRate}Hz
+                    {audioLog.audioFormat} @ {audioLog.bitrate}kbps
                   </span>
                 </div>
-                <audio
-                  controls
-                  className="w-full"
-                  src={pcmToWav(audioLog.audioBase64, audioLog.sampleRate)}
-                />
+                <audio controls className="w-full" src={mp3ToUrl(audioLog.audioBase64)} />
               </div>
             </div>
           ))}

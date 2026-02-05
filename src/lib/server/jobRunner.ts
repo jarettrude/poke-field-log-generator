@@ -10,12 +10,14 @@ import { getDatabase } from '@/lib/db/adapter';
 import type { ProcessingJob, ProcessingStage } from '@/lib/db/adapter';
 import { generateSummary, generateTts } from './gemini';
 import {
-  SERVER_SUMMARY_COOLDOWN_MS,
-  SERVER_TTS_COOLDOWN_MS,
-  SERVER_TTS_AUDIO_FORMAT,
-  SERVER_TTS_SAMPLE_RATE,
   jitteredCooldown,
+  SERVER_SUMMARY_COOLDOWN_MS,
+  SERVER_TTS_AUDIO_FORMAT,
+  SERVER_TTS_COOLDOWN_MS,
+  SERVER_TTS_SAMPLE_RATE,
+  SERVER_TTS_MP3_BITRATE,
 } from './config';
+import { convertPcmToMp3 } from './audioConverter';
 import { getOrFetchPokemonDetailsServer } from './pokemon';
 
 let runnerStarted = false;
@@ -239,15 +241,21 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
       }
     }
 
+    const mp3Data = await convertPcmToMp3(
+      audioData,
+      SERVER_TTS_SAMPLE_RATE,
+      SERVER_TTS_MP3_BITRATE
+    );
+
     await db.saveAudioLog({
       id: summary.id,
       name: summary.name,
       region: summary.region,
       generationId: summary.generationId,
       voice: job.voice,
-      audioBase64: audioData,
+      audioBase64: mp3Data,
       audioFormat: SERVER_TTS_AUDIO_FORMAT,
-      sampleRate: SERVER_TTS_SAMPLE_RATE,
+      bitrate: SERVER_TTS_MP3_BITRATE,
     });
 
     await setProgress({

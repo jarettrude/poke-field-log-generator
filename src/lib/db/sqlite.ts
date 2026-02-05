@@ -64,7 +64,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         voice TEXT NOT NULL,
         audio_base64 TEXT NOT NULL,
         audio_format TEXT NOT NULL,
-        sample_rate INTEGER NOT NULL,
+        bitrate INTEGER NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -129,6 +129,43 @@ export class SQLiteAdapter implements DatabaseAdapter {
     const hasRetryCount = jobColumns.some(c => c.name === 'retry_count');
     if (!hasRetryCount) {
       this.db.exec('ALTER TABLE jobs ADD COLUMN retry_count INTEGER DEFAULT 0');
+    }
+
+    // Migrate audio_logs table from sample_rate to bitrate if needed
+    const audioColumns = this.db
+      .prepare("SELECT name FROM pragma_table_info('audio_logs')")
+      .all() as Array<{ name: string }>;
+    const hasSampleRate = audioColumns.some(c => c.name === 'sample_rate');
+    const hasBitrate = audioColumns.some(c => c.name === 'bitrate');
+
+    if (hasSampleRate && !hasBitrate) {
+      // Migrate existing data: add bitrate column with default value of 128
+      this.db.exec('ALTER TABLE audio_logs ADD COLUMN bitrate INTEGER DEFAULT 128');
+      // Drop sample_rate column by recreating table
+      this.db.exec(`
+        CREATE TABLE audio_logs_new (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          region TEXT NOT NULL,
+          generation_id INTEGER NOT NULL,
+          voice TEXT NOT NULL,
+          audio_base64 TEXT NOT NULL,
+          audio_format TEXT NOT NULL,
+          bitrate INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `);
+      this.db.exec(`
+        INSERT INTO audio_logs_new (id, name, region, generation_id, voice, audio_base64, audio_format, bitrate, created_at, updated_at)
+        SELECT id, name, region, generation_id, voice, audio_base64, audio_format, bitrate, created_at, updated_at
+        FROM audio_logs
+      `);
+      this.db.exec('DROP TABLE audio_logs');
+      this.db.exec('ALTER TABLE audio_logs_new RENAME TO audio_logs');
+      this.db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_audio_logs_generation ON audio_logs(generation_id)
+      `);
     }
 
     // Create indexes
@@ -202,7 +239,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
     const stmt = this.db!.prepare(`
       INSERT OR REPLACE INTO audio_logs
-      (id, name, region, generation_id, voice, audio_base64, audio_format, sample_rate, created_at, updated_at)
+      (id, name, region, generation_id, voice, audio_base64, audio_format, bitrate, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM audio_logs WHERE id = ?), ?), ?)
     `);
 
@@ -214,7 +251,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
       audioLog.voice,
       audioLog.audioBase64,
       audioLog.audioFormat,
-      audioLog.sampleRate,
+      audioLog.bitrate,
       audioLog.id,
       now,
       now
@@ -238,7 +275,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
   async getAllAudioLogsMetadata(): Promise<AudioLogMetadata[]> {
     const stmt = this.db!.prepare(
-      'SELECT id, name, region, generation_id, voice, audio_format, sample_rate, created_at, updated_at FROM audio_logs ORDER BY id'
+      'SELECT id, name, region, generation_id, voice, audio_format, bitrate, created_at, updated_at FROM audio_logs ORDER BY id'
     );
     const rows = stmt.all() as DatabaseRow[];
     return rows.map(this.mapRowToAudioLogMetadata);
@@ -252,7 +289,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
   async getAudioLogsMetadataByGeneration(genId: number): Promise<AudioLogMetadata[]> {
     const stmt = this.db!.prepare(
-      'SELECT id, name, region, generation_id, voice, audio_format, sample_rate, created_at, updated_at FROM audio_logs WHERE generation_id = ? ORDER BY id'
+      'SELECT id, name, region, generation_id, voice, audio_format, bitrate, created_at, updated_at FROM audio_logs WHERE generation_id = ? ORDER BY id'
     );
     const rows = stmt.all(genId) as DatabaseRow[];
     return rows.map(this.mapRowToAudioLogMetadata);
@@ -515,7 +552,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
       voice: row.voice as string,
       audioBase64: row.audio_base64 as string,
       audioFormat: row.audio_format as StoredAudioLog['audioFormat'],
-      sampleRate: row.sample_rate as number,
+      bitrate: row.bitrate as number,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
     };
@@ -529,7 +566,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
       generationId: row.generation_id as number,
       voice: row.voice as string,
       audioFormat: row.audio_format as StoredAudioLog['audioFormat'],
-      sampleRate: row.sample_rate as number,
+      bitrate: row.bitrate as number,
       createdAt: row.created_at as string,
       updatedAt: row.updated_at as string,
     };

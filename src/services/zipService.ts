@@ -1,4 +1,4 @@
-import { pcmToWavBlob } from './audioUtils';
+import { mp3ToBlob } from './audioUtils';
 import { ProcessedPokemon } from '../types';
 import { formatPokemonId } from '../utils/pokemonUtils';
 
@@ -60,8 +60,8 @@ export const createPokemonZip = async (pokemon: ProcessedPokemon): Promise<Blob>
   const folder = zip.folder(folderName);
 
   if (pokemon.audioData) {
-    const audioBlob = pcmToWavBlob(pokemon.audioData);
-    folder.file(`${paddedId}-${pokemon.name}.wav`, audioBlob);
+    const audioBlob = mp3ToBlob(pokemon.audioData);
+    folder.file(`${paddedId}-${pokemon.name}.mp3`, audioBlob);
   }
 
   if (pokemon.pngData) {
@@ -99,8 +99,8 @@ export const createBatchZip = async (
     const folder = zip.folder(`${paddedId}-${pokemon.name}`);
 
     if (pokemon.audioData) {
-      const audioBlob = pcmToWavBlob(pokemon.audioData);
-      folder.file(`${paddedId}-${pokemon.name}.wav`, audioBlob);
+      const audioBlob = mp3ToBlob(pokemon.audioData);
+      folder.file(`${paddedId}-${pokemon.name}.mp3`, audioBlob);
     }
 
     if (pokemon.pngData) {

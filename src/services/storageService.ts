@@ -53,8 +53,8 @@ export interface StoredAudioLog {
   generationId: number;
   voice: string;
   audioBase64: string;
-  audioFormat: 'pcm_s16le' | 'wav';
-  sampleRate: number;
+  audioFormat: 'mp3';
+  bitrate: number;
   /** ISO timestamp string. */
   createdAt: string;
   /** ISO timestamp string. */
@@ -68,8 +68,8 @@ export interface AudioLogMetadata {
   region: string;
   generationId: number;
   voice: string;
-  audioFormat: 'pcm_s16le' | 'wav';
-  sampleRate: number;
+  audioFormat: 'mp3';
+  bitrate: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -82,8 +82,8 @@ export interface AudioLogInput {
   generationId: number;
   voice: string;
   audioBase64: string;
-  audioFormat: 'pcm_s16le' | 'wav';
-  sampleRate: number;
+  audioFormat: 'mp3';
+  bitrate: number;
 }
 
 /**

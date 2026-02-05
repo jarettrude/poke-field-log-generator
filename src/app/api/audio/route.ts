@@ -28,7 +28,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { id, name, region, generationId, voice, audioBase64, audioFormat, sampleRate } = body;
+    const { id, name, region, generationId, voice, audioBase64, audioFormat, bitrate } = body;
 
     if (
       typeof id !== 'number' ||
@@ -43,9 +43,9 @@ export async function POST(request: Request) {
       !voice ||
       typeof audioBase64 !== 'string' ||
       !audioBase64 ||
-      (audioFormat !== 'pcm_s16le' && audioFormat !== 'wav') ||
-      typeof sampleRate !== 'number' ||
-      sampleRate <= 0
+      audioFormat !== 'mp3' ||
+      typeof bitrate !== 'number' ||
+      bitrate <= 0
     ) {
       return errorResponse('Missing or invalid required fields', 400);
     }
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       voice,
       audioBase64,
       audioFormat,
-      sampleRate,
+      bitrate,
     });
 
     return successResponse({ saved: true });

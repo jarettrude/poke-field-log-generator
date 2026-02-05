@@ -1,44 +1,24 @@
 /**
- * Convert base64-encoded 16-bit PCM mono audio into a WAV `Blob`.
+ * Convert base64-encoded MP3 audio into an MP3 `Blob`.
  *
- * @param pcmBase64 Base64-encoded PCM16LE data (mono).
- * @param sampleRate Sample rate in Hz.
+ * @param mp3Base64 Base64-encoded MP3 data.
  */
-export function pcmToWavBlob(pcmBase64: string, sampleRate: number = 24000): Blob {
-  const binaryString = atob(pcmBase64);
+export function mp3ToBlob(mp3Base64: string): Blob {
+  const binaryString = atob(mp3Base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
-
-  const wavHeader = new ArrayBuffer(44);
-  const view = new DataView(wavHeader);
-
-  view.setUint32(0, 0x52494646, false); // "RIFF"
-  view.setUint32(4, 36 + len, true);
-  view.setUint32(8, 0x57415645, false); // "WAVE"
-  view.setUint32(12, 0x666d7420, false); // "fmt "
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  view.setUint32(36, 0x64617461, false); // "data"
-  view.setUint32(40, len, true);
-
-  return new Blob([wavHeader, bytes], { type: 'audio/wav' });
+  return new Blob([bytes], { type: 'audio/mpeg' });
 }
 
 /**
- * Convert base64-encoded PCM audio into a temporary WAV object URL.
+ * Convert base64-encoded MP3 audio into a temporary MP3 object URL.
  *
- * @param pcmBase64 Base64-encoded PCM16LE data (mono).
- * @param sampleRate Sample rate in Hz.
+ * @param mp3Base64 Base64-encoded MP3 data.
  */
-export function pcmToWav(pcmBase64: string, sampleRate: number = 24000): string {
-  const blob = pcmToWavBlob(pcmBase64, sampleRate);
+export function mp3ToUrl(mp3Base64: string): string {
+  const blob = mp3ToBlob(mp3Base64);
   return URL.createObjectURL(blob);
 }
