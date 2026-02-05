@@ -5,7 +5,7 @@
  * This validates the data transformation chain and error handling at each stage.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { convertPcmToMp3 } from '../audioConverter';
 
 /**
@@ -30,7 +30,11 @@ function mockGeminiTtsResponse(options: {
   mimeType?: string;
   hasCandidate?: boolean;
 }) {
-  const { data = generatePcmBase64(1000), mimeType = 'audio/L16;rate=24000', hasCandidate = true } = options;
+  const {
+    data = generatePcmBase64(1000),
+    mimeType = 'audio/L16;rate=24000',
+    hasCandidate = true,
+  } = options;
 
   if (!hasCandidate) {
     return { candidates: [] };
@@ -82,13 +86,17 @@ describe('TTS pipeline: response extraction', () => {
   it('should throw on empty candidates', () => {
     const response = mockGeminiTtsResponse({ hasCandidate: false });
 
-    expect(() => extractAudioFromResponse(response)).toThrow('Voice engine failed to respond with data.');
+    expect(() => extractAudioFromResponse(response)).toThrow(
+      'Voice engine failed to respond with data.'
+    );
   });
 
   it('should throw on null inlineData', () => {
     const response = mockGeminiTtsResponse({ data: null });
 
-    expect(() => extractAudioFromResponse(response)).toThrow('Voice engine failed to respond with data.');
+    expect(() => extractAudioFromResponse(response)).toThrow(
+      'Voice engine failed to respond with data.'
+    );
   });
 
   it('should extract data even with unexpected mimeType', () => {
@@ -151,7 +159,11 @@ describe('TTS pipeline: end-to-end data flow (mocked API)', () => {
 
     const pcmBase64 = generatePcmBase64(2000, SERVER_TTS_SAMPLE_RATE);
 
-    const mp3Base64 = await convertPcmToMp3(pcmBase64, SERVER_TTS_SAMPLE_RATE, SERVER_TTS_MP3_BITRATE);
+    const mp3Base64 = await convertPcmToMp3(
+      pcmBase64,
+      SERVER_TTS_SAMPLE_RATE,
+      SERVER_TTS_MP3_BITRATE
+    );
 
     expect(mp3Base64).toBeTruthy();
 

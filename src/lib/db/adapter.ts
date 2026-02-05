@@ -191,11 +191,21 @@ export async function getDatabaseAdapter(): Promise<DatabaseAdapter> {
 
 // Singleton instance
 let dbInstance: DatabaseAdapter | null = null;
+let dbInitPromise: Promise<DatabaseAdapter> | null = null;
 
 export async function getDatabase(): Promise<DatabaseAdapter> {
-  if (!dbInstance) {
-    dbInstance = await getDatabaseAdapter();
-    await dbInstance.initialize();
+  if (dbInstance) {
+    return dbInstance;
   }
-  return dbInstance;
+
+  if (!dbInitPromise) {
+    dbInitPromise = (async () => {
+      const adapter = await getDatabaseAdapter();
+      await adapter.initialize();
+      dbInstance = adapter;
+      return adapter;
+    })();
+  }
+
+  return dbInitPromise;
 }
