@@ -1,5 +1,6 @@
 onlyBuiltDependencies:
   - better-sqlite3
+  - ffmpeg-static
   - protobufjs
   - sharp
   - unrs-resolver
