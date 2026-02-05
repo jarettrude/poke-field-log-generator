@@ -45,6 +45,8 @@ next-env.d.ts
 *.db
 *.db-shm
 *.db-wal
+/data/*
+!/data/.gitkeep
 
 # saved files
 **/pokemon/*.png

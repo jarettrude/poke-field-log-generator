@@ -31,8 +31,8 @@ export class SQLiteAdapter implements DatabaseAdapter {
   private dbPath: string;
 
   constructor(dbPath?: string) {
-    // Store in project root by default
-    this.dbPath = dbPath || path.join(process.cwd(), 'pokemon_data.db');
+    // Store in data directory by default (works with Docker volume mounts)
+    this.dbPath = dbPath || path.join(process.cwd(), 'data', 'pokemon_data.db');
   }
 
   async initialize(): Promise<void> {
