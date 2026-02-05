@@ -146,10 +146,12 @@ const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId }) => {
   );
 };
 
-interface CachedPokemonImage {
+interface CachedPokemonData {
   id: number;
   imagePngPath?: string | null;
   imageSvgPath?: string | null;
+  generationId?: number;
+  region?: string;
 }
 
 interface PokedexLibraryViewProps {
@@ -178,7 +180,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   );
   const [rangeStart, setRangeStart] = useState<number>(1);
   const [rangeEnd, setRangeEnd] = useState<number>(151);
-  const [pokemonImages, setPokemonImages] = useState<Map<number, CachedPokemonImage>>(new Map());
+  const [pokemonCache, setPokemonCache] = useState<Map<number, CachedPokemonData>>(new Map());
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingSummaryId, setEditingSummaryId] = useState<number | null>(null);
   const [summaryDraft, setSummaryDraft] = useState('');
@@ -196,9 +198,9 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   }, []);
 
   useEffect(() => {
-    const fetchImages = async () => {
+    const fetchPokemonData = async () => {
       const allIds = new Set([...summaries.map(s => s.id), ...audioLogs.map(a => a.id)]);
-      const newImages = new Map<number, CachedPokemonImage>();
+      const newCache = new Map<number, CachedPokemonData>();
 
       for (const id of allIds) {
         try {
@@ -206,31 +208,35 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           if (res.ok) {
             const response = await res.json();
             const data = response.data;
-            if (data && (data.imagePngPath || data.imageSvgPath)) {
-              newImages.set(id, {
+            if (data) {
+              newCache.set(id, {
                 id,
-                imagePngPath: data.imagePngPath,
+                imagePngPath:
+                  data.imagePngPath ||
+                  `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
                 imageSvgPath: data.imageSvgPath,
+                generationId: data.generationId,
+                region: data.region,
               });
             } else {
-              // Fallback to PokeAPI sprites
-              newImages.set(id, {
+              // No cached data, use fallbacks
+              newCache.set(id, {
                 id,
                 imagePngPath: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
                 imageSvgPath: null,
               });
             }
           } else {
-            // API returned error, use PokeAPI fallback
-            newImages.set(id, {
+            // API returned error, use fallback
+            newCache.set(id, {
               id,
               imagePngPath: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
               imageSvgPath: null,
             });
           }
         } catch {
-          // Fetch failed, use PokeAPI fallback
-          newImages.set(id, {
+          // Fetch failed, use fallback
+          newCache.set(id, {
             id,
             imagePngPath: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
             imageSvgPath: null,
@@ -238,21 +244,22 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         }
       }
 
-      setPokemonImages(newImages);
+      setPokemonCache(newCache);
     };
 
-    fetchImages();
+    fetchPokemonData();
   }, [summaries, audioLogs]);
 
   const entries = useMemo(() => {
     const entryMap = new Map<number, PokedexEntry>();
 
     summaries.forEach(s => {
+      const cached = pokemonCache.get(s.id);
       entryMap.set(s.id, {
         id: s.id,
         name: s.name,
-        region: s.region,
-        generationId: s.generationId,
+        region: cached?.region || s.region,
+        generationId: cached?.generationId || s.generationId,
         summary: s.summary,
         hasAudio: false,
       });
@@ -268,11 +275,12 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           bitrate: a.bitrate,
         };
       } else {
+        const cached = pokemonCache.get(a.id);
         entryMap.set(a.id, {
           id: a.id,
           name: a.name,
-          region: a.region,
-          generationId: a.generationId,
+          region: cached?.region || a.region,
+          generationId: cached?.generationId || a.generationId,
           hasAudio: true,
           audioMeta: {
             voice: a.voice,
@@ -284,7 +292,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
     });
 
     return Array.from(entryMap.values()).sort((a, b) => a.id - b.id);
-  }, [summaries, audioLogs]);
+  }, [summaries, audioLogs, pokemonCache]);
 
   const filteredEntries = useMemo(() => {
     return entries.filter(entry => {
@@ -846,7 +854,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           const isSelected = selectedIds.has(entry.id);
           const hasText = !!entry.summary;
           const hasAudio = entry.hasAudio;
-          const cachedImage = pokemonImages.get(entry.id);
+          const cachedImage = pokemonCache.get(entry.id);
           const imageSrc = cachedImage?.imageSvgPath || cachedImage?.imagePngPath;
           const isEditingSummary = editingSummaryId === entry.id;
           const isSavingSummary = savingSummaryIds.has(entry.id);

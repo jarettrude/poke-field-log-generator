@@ -40,6 +40,8 @@ export interface CachedPokemon {
   moveNames: string[];
   imagePngPath: string | null;
   imageSvgPath: string | null;
+  generationId: number;
+  region: string;
   cachedAt: string;
 }
 
@@ -73,6 +75,8 @@ export interface PokemonInput {
   moveNames: string[];
   imagePngPath: string | null;
   imageSvgPath: string | null;
+  generationId: number;
+  region: string;
 }
 
 export interface StoredPrompt {

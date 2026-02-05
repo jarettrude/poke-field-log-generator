@@ -102,14 +102,14 @@ async function processSummaryStage(job: ProcessingJob): Promise<'ok' | 'paused' 
     while (!success && retryCount < MAX_RETRIES) {
       try {
         const details = await getOrFetchPokemonDetailsServer(pokemonId);
-        const summary = await generateSummary(details, job.region);
+        const summary = await generateSummary(details, details.region);
 
         await db.saveSummary({
           id: details.id,
           name: details.name,
           summary,
-          region: job.region,
-          generationId: job.generationId,
+          region: details.region,
+          generationId: details.generationId,
         });
 
         success = true;

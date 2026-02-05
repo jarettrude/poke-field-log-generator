@@ -27,7 +27,23 @@ type SpeciesResponse = {
     flavor_text: string;
     language: { name: string };
   }>;
+  generation: {
+    name: string;
+    url: string;
+  };
 };
+
+type GenerationResponse = {
+  id: number;
+  main_region: {
+    name: string;
+    url: string;
+  };
+};
+
+function capitalizeRegion(name: string): string {
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
 
 /**
  * Download PNG and SVG sprites to public/pokemon/ and return local paths.
@@ -93,6 +109,8 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
       flavorTexts: cached.flavorTexts,
       allMoveNames: cached.moveNames,
       habitat: cached.habitat,
+      generationId: cached.generationId,
+      region: cached.region,
     };
   }
 
@@ -121,6 +139,17 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
     imageSvgUrl,
   });
 
+  // Extract generation ID from the generation URL (e.g., ".../generation/3/" -> 3)
+  const generationId = parseInt(speciesData.generation.url.split('/').filter(Boolean).pop()!, 10);
+
+  // Fetch region name from generation endpoint
+  const generationRes = await fetch(speciesData.generation.url);
+  let region = 'Unknown';
+  if (generationRes.ok) {
+    const generationData = (await generationRes.json()) as GenerationResponse;
+    region = capitalizeRegion(generationData.main_region.name);
+  }
+
   await db.cachePokemon({
     id: pokemonData.id,
     name: pokemonData.name,
@@ -132,6 +161,8 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
     moveNames: pokemonData.moves.map(m => m.move.name.replace(/-/g, ' ')),
     imagePngPath,
     imageSvgPath,
+    generationId,
+    region,
   });
 
   return {
@@ -145,5 +176,7 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
     flavorTexts: Array.from(new Set(flavorTexts)),
     allMoveNames: pokemonData.moves.map(m => m.move.name.replace(/-/g, ' ')),
     habitat: speciesData.habitat?.name || 'the unknown wild',
+    generationId,
+    region,
   };
 }

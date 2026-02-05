@@ -8,24 +8,20 @@ import { PokemonDetails, PokemonBaseInfo, PokemonSprites } from '../types';
 const BASE_URL = 'https://pokeapi.co/api/v2';
 const API_BASE = '/api';
 
-// Region mapping for each generation
-const GENERATION_REGIONS: Record<number, string> = {
-  1: 'Kanto',
-  2: 'Johto',
-  3: 'Hoenn',
-  4: 'Sinnoh',
-  5: 'Unova',
-  6: 'Kalos',
-  7: 'Alola',
-  8: 'Galar',
-  9: 'Paldea',
-};
-
-/**
- * Fetches generation info including the main region name
- */
-interface GenerationResponse {
+interface GenerationListResponse {
   results: Array<{ name: string; url: string }>;
+}
+
+interface GenerationDetailResponse {
+  id: number;
+  main_region: {
+    name: string;
+    url: string;
+  };
+}
+
+function capitalizeRegion(name: string): string {
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 interface PokemonSpeciesResponse {
@@ -49,20 +45,26 @@ interface SpeciesResponse {
     flavor_text: string;
     language: { name: string };
   }>;
+  generation: {
+    name: string;
+    url: string;
+  };
 }
 
 /**
- * Fetch generation metadata and return the generation name plus a best-effort
- * mapping to a canonical region label.
+ * Fetch generation metadata and return the generation name plus region from PokeAPI.
  */
 export const fetchGenerationWithRegion = async (
   genId: number
 ): Promise<{ name: string; region: string }> => {
-  const gen = await fetchGenerations();
-  const genInfo = gen.find((g: { id: number; name: string }) => g.id === genId);
+  const res = await fetch(`${BASE_URL}/generation/${genId}`);
+  if (!res.ok) {
+    return { name: `Generation ${genId}`, region: 'Unknown' };
+  }
+  const data = (await res.json()) as GenerationDetailResponse;
   return {
-    name: genInfo?.name || `Generation ${genId}`,
-    region: GENERATION_REGIONS[genId] || 'Unknown Region',
+    name: `Generation ${data.id}`,
+    region: capitalizeRegion(data.main_region.name),
   };
 };
 
@@ -71,7 +73,7 @@ export const fetchGenerationWithRegion = async (
  */
 export const fetchGenerations = async () => {
   const res = await fetch(`${BASE_URL}/generation`);
-  const data = (await res.json()) as GenerationResponse;
+  const data = (await res.json()) as GenerationListResponse;
   return data.results.map((g, index: number) => ({
     id: index + 1,
     name: g.name.replace('generation-', 'Generation ').toUpperCase(),
@@ -127,6 +129,8 @@ interface CachedPokemonResponse {
   moveNames: string[];
   imagePngPath: string | null;
   imageSvgPath: string | null;
+  generationId: number;
+  region: string;
 }
 
 /**
@@ -154,6 +158,8 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
       flavorTexts: cachedData.flavorTexts,
       allMoveNames: cachedData.moveNames,
       habitat: cachedData.habitat,
+      generationId: cachedData.generationId,
+      region: cachedData.region,
     };
   }
 
@@ -171,6 +177,17 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
   const imagePngUrl = pokemonData.sprites.other['official-artwork'].front_default;
   const imageSvgUrl = pokemonData.sprites.other['dream_world'].front_default;
 
+  // Extract generation ID from the generation URL (e.g., ".../generation/3/" -> 3)
+  const generationId = parseInt(speciesData.generation.url.split('/').filter(Boolean).pop()!, 10);
+
+  // Fetch region name from generation endpoint
+  const generationRes = await fetch(speciesData.generation.url);
+  let region = 'Unknown';
+  if (generationRes.ok) {
+    const generationData = (await generationRes.json()) as GenerationDetailResponse;
+    region = capitalizeRegion(generationData.main_region.name);
+  }
+
   // Cache to database (images will be downloaded by backend)
   const saveResponse = await fetch(`${API_BASE}/pokemon/${id}`, {
     method: 'POST',
@@ -185,6 +202,8 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
       moveNames: pokemonData.moves.map(m => m.move.name.replace(/-/g, ' ')),
       imagePngUrl,
       imageSvgUrl,
+      generationId,
+      region,
     }),
   });
 
@@ -206,5 +225,7 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
     flavorTexts: Array.from(new Set(flavorTexts)),
     allMoveNames: pokemonData.moves.map(m => m.move.name.replace(/-/g, ' ')),
     habitat: speciesData.habitat?.name || 'the unknown wild',
+    generationId,
+    region,
   };
 };

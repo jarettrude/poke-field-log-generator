@@ -83,9 +83,24 @@ export class SQLiteAdapter implements DatabaseAdapter {
         move_names TEXT NOT NULL,
         image_png_path TEXT,
         image_svg_path TEXT,
+        generation_id INTEGER NOT NULL DEFAULT 1,
+        region TEXT NOT NULL DEFAULT 'Unknown',
         cached_at TEXT NOT NULL
       )
     `);
+
+    // Migrate pokemon_cache table to add generation_id and region if needed
+    const pokemonColumns = this.db
+      .prepare("SELECT name FROM pragma_table_info('pokemon_cache')")
+      .all() as Array<{ name: string }>;
+    const hasGenerationId = pokemonColumns.some(c => c.name === 'generation_id');
+    const hasRegion = pokemonColumns.some(c => c.name === 'region');
+    if (!hasGenerationId) {
+      this.db.exec('ALTER TABLE pokemon_cache ADD COLUMN generation_id INTEGER NOT NULL DEFAULT 1');
+    }
+    if (!hasRegion) {
+      this.db.exec("ALTER TABLE pokemon_cache ADD COLUMN region TEXT NOT NULL DEFAULT 'Unknown'");
+    }
 
     // Create prompts table
     this.db.exec(`
@@ -306,8 +321,8 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
     const stmt = this.db!.prepare(`
       INSERT OR REPLACE INTO pokemon_cache 
-      (id, name, height, weight, types, habitat, flavor_texts, move_names, image_png_path, image_svg_path, cached_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, name, height, weight, types, habitat, flavor_texts, move_names, image_png_path, image_svg_path, generation_id, region, cached_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -321,6 +336,8 @@ export class SQLiteAdapter implements DatabaseAdapter {
       JSON.stringify(pokemon.moveNames),
       pokemon.imagePngPath,
       pokemon.imageSvgPath,
+      pokemon.generationId,
+      pokemon.region,
       now
     );
   }
@@ -539,6 +556,8 @@ export class SQLiteAdapter implements DatabaseAdapter {
       moveNames: JSON.parse(row.move_names as string),
       imagePngPath: row.image_png_path as string | null,
       imageSvgPath: row.image_svg_path as string | null,
+      generationId: (row.generation_id as number) || 1,
+      region: (row.region as string) || 'Unknown',
       cachedAt: row.cached_at as string,
     };
   }

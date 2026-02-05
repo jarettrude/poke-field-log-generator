@@ -16,8 +16,9 @@ export interface PokemonDetails {
   imageSvg: string | null;
   flavorTexts: string[];
   allMoveNames: string[];
-  habitat: string; // Added for narrative context
-  region?: string; // Region name (Kanto, Johto, etc.)
+  habitat: string;
+  generationId: number;
+  region: string;
 }
 
 /** A Pokémon generation available for selection. */

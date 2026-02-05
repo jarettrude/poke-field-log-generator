@@ -81,6 +81,8 @@ export async function POST(request: Request, { params }: RouteParams) {
       moveNames,
       imagePngUrl,
       imageSvgUrl,
+      generationId,
+      region,
     } = body;
 
     if (
@@ -90,7 +92,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       !Array.isArray(types) ||
       typeof habitat !== 'string' ||
       !Array.isArray(flavorTexts) ||
-      !Array.isArray(moveNames)
+      !Array.isArray(moveNames) ||
+      typeof generationId !== 'number' ||
+      typeof region !== 'string'
     ) {
       return errorResponse('Invalid request body', 400);
     }
@@ -116,6 +120,8 @@ export async function POST(request: Request, { params }: RouteParams) {
       moveNames,
       imagePngPath,
       imageSvgPath,
+      generationId,
+      region,
     });
 
     return successResponse({
