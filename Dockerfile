@@ -20,7 +20,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # Expose Next.js dev server port
-EXPOSE 3000
+EXPOSE 3333
 
 # Default command for development
 CMD ["pnpm", "dev"]
