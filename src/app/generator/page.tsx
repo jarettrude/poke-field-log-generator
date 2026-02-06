@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { createJob, pauseJob, resumeJob, cancelJob } from '@/services/jobsService';
 
@@ -24,7 +23,6 @@ type GeneratorView = 'select' | 'processing' | 'results';
 
 function GeneratorPageInner() {
   const { showToast } = useToast();
-  const router = useRouter();
 
   const [currentView, setCurrentView] = useState<GeneratorView>('select');
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode>(WorkflowMode.FULL);
@@ -45,6 +43,11 @@ function GeneratorPageInner() {
     setRangeStart,
     setRangeEnd,
     handleGenChange,
+    // Variant mode
+    collectionType,
+    selectedVariantCategories,
+    handleCollectionTypeChange,
+    toggleVariantCategory,
   } = usePokemonData();
 
   const { savedSummaries, savedAudioLogs, refreshData: refreshSavedData } = useSavedData();
@@ -59,14 +62,16 @@ function GeneratorPageInner() {
     setIsProcessing,
     setCooldown,
   } = useJobPolling({
-    onJobComplete: (jobResults, mode) => {
+    onJobComplete: jobResults => {
       refreshSavedData();
 
-      if (mode === 'SUMMARY_ONLY') {
-        router.push('/library');
-      } else {
+      // All modes go to results view if there are any results
+      if (jobResults.length > 0) {
         setResults(jobResults);
         setCurrentView('results');
+      } else {
+        // If no results (shouldn't happen normally), go back to select
+        setCurrentView('select');
       }
     },
     onJobCanceled: () => {
@@ -195,6 +200,10 @@ function GeneratorPageInner() {
             isLoading={isLoading}
             savedSummaries={savedSummaries}
             savedAudioLogs={savedAudioLogs}
+            collectionType={collectionType}
+            onCollectionTypeChange={handleCollectionTypeChange}
+            selectedVariantCategories={selectedVariantCategories}
+            onToggleVariantCategory={toggleVariantCategory}
           />
         )}
 

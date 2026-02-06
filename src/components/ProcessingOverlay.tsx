@@ -4,7 +4,15 @@ import { CooldownState } from '../types';
 import { POKEBALL_IMAGE, getRandomFlavorText } from '../constants';
 
 interface ProcessingOverlayProps {
-  progress: { current: number; total: number; message: string; stage: 'summary' | 'audio' };
+  progress: {
+    current: number;
+    total: number;
+    message: string;
+    stage: 'summary' | 'audio';
+    currentPokemonId?: number;
+    currentPokemonName?: string;
+    currentPokemonImage?: string;
+  };
   cooldown: CooldownState | null;
   currentSummary: string | null;
   isPaused: boolean;
@@ -38,13 +46,17 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
     return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
   };
 
+  // Show pokeball during cooldown or when no pokemon image is available
+  const showPokeball = cooldown?.active || !progress.currentPokemonImage;
+  const currentImage = showPokeball ? POKEBALL_IMAGE : progress.currentPokemonImage;
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-auto p-6 backdrop-blur-md"
       style={{ background: 'var(--surface-overlay)' }}
     >
       <div className="w-full max-w-2xl space-y-8 text-center">
-        {/* Animated Pokeball */}
+        {/* Animated Pokemon/Pokeball Image */}
         <div className="relative mx-auto inline-flex h-36 w-36 items-center justify-center">
           <div
             className={`absolute inset-0 rounded-full border-4 shadow-lg ${!isPaused && !cooldown?.active ? 'animate-spin' : 'opacity-30'}`}
@@ -54,13 +66,21 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
             }}
           />
           <Image
-            src={POKEBALL_IMAGE}
-            width={56}
-            height={56}
-            className="h-14 w-14 object-contain"
-            alt="Processing"
+            src={currentImage || POKEBALL_IMAGE}
+            width={showPokeball ? 56 : 80}
+            height={showPokeball ? 56 : 80}
+            className={`object-contain transition-all duration-300 ${showPokeball ? 'h-14 w-14' : 'h-20 w-20'}`}
+            alt={progress.currentPokemonName || 'Processing'}
+            unoptimized={!showPokeball}
           />
         </div>
+
+        {/* Current Pokemon Name */}
+        {progress.currentPokemonName && !cooldown?.active && (
+          <div className="text-lg font-bold capitalize" style={{ color: 'var(--text-primary)' }}>
+            #{progress.currentPokemonId?.toString().padStart(3, '0')} {progress.currentPokemonName}
+          </div>
+        )}
 
         {/* Status */}
         <div className="space-y-4">

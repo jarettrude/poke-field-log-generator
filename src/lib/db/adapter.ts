@@ -1,14 +1,13 @@
-/**
- * Database Adapter Interface
- * Provides abstraction for different database backends (SQLite, MySQL)
- */
+import { VariantCategory } from '../../types';
 
 export interface StoredSummary {
   id: number;
   name: string;
+  displayName?: string;
   summary: string;
   region: string;
   generationId: number;
+  variantCategory?: VariantCategory;
   createdAt: string;
   updatedAt: string;
 }
@@ -16,12 +15,14 @@ export interface StoredSummary {
 export interface StoredAudioLog {
   id: number;
   name: string;
+  displayName?: string;
   region: string;
   generationId: number;
   voice: string;
   audioBase64: string;
   audioFormat: 'mp3';
   bitrate: number;
+  variantCategory?: VariantCategory;
   createdAt: string;
   updatedAt: string;
 }
@@ -32,6 +33,7 @@ export type AudioLogMetadata = Omit<StoredAudioLog, 'audioBase64'>;
 export interface CachedPokemon {
   id: number;
   name: string;
+  displayName: string;
   height: number;
   weight: number;
   types: string[];
@@ -42,6 +44,11 @@ export interface CachedPokemon {
   imageSvgPath: string | null;
   generationId: number;
   region: string;
+  speciesId: number;
+  isDefault: boolean;
+  formName: string | null;
+  variantCategory: VariantCategory;
+  regionName: string | null;
   cachedAt: string;
 }
 
@@ -67,6 +74,7 @@ export interface AudioLogInput {
 export interface PokemonInput {
   id: number;
   name: string;
+  displayName: string;
   height: number;
   weight: number;
   types: string[];
@@ -77,6 +85,11 @@ export interface PokemonInput {
   imageSvgPath: string | null;
   generationId: number;
   region: string;
+  speciesId: number;
+  isDefault: boolean;
+  formName: string | null;
+  variantCategory: VariantCategory;
+  regionName: string | null;
 }
 
 export interface StoredPrompt {

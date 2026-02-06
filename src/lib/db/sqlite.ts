@@ -102,6 +102,37 @@ export class SQLiteAdapter implements DatabaseAdapter {
       this.db.exec("ALTER TABLE pokemon_cache ADD COLUMN region TEXT NOT NULL DEFAULT 'Unknown'");
     }
 
+    // Migration for variant support columns
+    const hasDisplayName = pokemonColumns.some(c => c.name === 'display_name');
+    if (!hasDisplayName) {
+      this.db.exec('ALTER TABLE pokemon_cache ADD COLUMN display_name TEXT');
+      this.db.exec('ALTER TABLE pokemon_cache ADD COLUMN species_id INTEGER');
+      this.db.exec('ALTER TABLE pokemon_cache ADD COLUMN is_default INTEGER DEFAULT 1');
+      this.db.exec('ALTER TABLE pokemon_cache ADD COLUMN form_name TEXT');
+      this.db.exec("ALTER TABLE pokemon_cache ADD COLUMN variant_category TEXT DEFAULT 'default'");
+      this.db.exec('ALTER TABLE pokemon_cache ADD COLUMN region_name TEXT');
+
+      // Backfill existing data with defaults
+      this.db.exec(`
+        UPDATE pokemon_cache 
+        SET display_name = name,
+            species_id = id,
+            is_default = 1,
+            variant_category = 'default'
+        WHERE display_name IS NULL
+      `);
+
+      console.log('Migrated pokemon_cache table with variant columns');
+    }
+
+    // Create indexes for variant queries
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_pokemon_variant_category ON pokemon_cache(variant_category)
+    `);
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_pokemon_species_id ON pokemon_cache(species_id)
+    `);
+
     // Create prompts table
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS prompts (
@@ -315,19 +346,21 @@ export class SQLiteAdapter implements DatabaseAdapter {
     stmt.run(id);
   }
 
-  // Pokemon cache operations
   async cachePokemon(pokemon: PokemonInput): Promise<void> {
     const now = new Date().toISOString();
 
     const stmt = this.db!.prepare(`
       INSERT OR REPLACE INTO pokemon_cache 
-      (id, name, height, weight, types, habitat, flavor_texts, move_names, image_png_path, image_svg_path, generation_id, region, cached_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, name, display_name, height, weight, types, habitat, flavor_texts, move_names, 
+       image_png_path, image_svg_path, generation_id, region, species_id, is_default, 
+       form_name, variant_category, region_name, cached_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
       pokemon.id,
       pokemon.name,
+      pokemon.displayName,
       pokemon.height,
       pokemon.weight,
       JSON.stringify(pokemon.types),
@@ -338,6 +371,11 @@ export class SQLiteAdapter implements DatabaseAdapter {
       pokemon.imageSvgPath,
       pokemon.generationId,
       pokemon.region,
+      pokemon.speciesId,
+      pokemon.isDefault ? 1 : 0,
+      pokemon.formName,
+      pokemon.variantCategory,
+      pokemon.regionName,
       now
     );
   }
@@ -545,9 +583,11 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   private mapRowToPokemon(row: DatabaseRow): CachedPokemon {
+    const name = row.name as string;
     return {
       id: row.id as number,
-      name: row.name as string,
+      name: name,
+      displayName: (row.display_name as string) || name,
       height: row.height as number,
       weight: row.weight as number,
       types: JSON.parse(row.types as string),
@@ -558,6 +598,11 @@ export class SQLiteAdapter implements DatabaseAdapter {
       imageSvgPath: row.image_svg_path as string | null,
       generationId: (row.generation_id as number) || 1,
       region: (row.region as string) || 'Unknown',
+      speciesId: (row.species_id as number) || (row.id as number),
+      isDefault: row.is_default === 1,
+      formName: (row.form_name as string) || null,
+      variantCategory: (row.variant_category as CachedPokemon['variantCategory']) || 'default',
+      regionName: (row.region_name as string) || null,
       cachedAt: row.cached_at as string,
     };
   }

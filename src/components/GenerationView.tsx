@@ -1,6 +1,12 @@
 import React, { useMemo } from 'react';
-import { Volume2, FileText, Wand2, Mic } from 'lucide-react';
-import { Generation, PokemonBaseInfo, WorkflowMode } from '../types';
+import { Volume2, FileText, Wand2, Mic, Layers, Sparkles, Zap, Globe, Crown } from 'lucide-react';
+import {
+  Generation,
+  PokemonBaseInfo,
+  WorkflowMode,
+  CollectionType,
+  VariantCategory,
+} from '../types';
 import { StoredSummary, AudioLogMetadata } from '../services/storageService';
 import { VOICE_OPTIONS } from '../constants';
 import { formatPokemonId } from '../utils/pokemonUtils';
@@ -25,7 +31,25 @@ interface GenerationViewProps {
   isLoading: boolean;
   savedSummaries: StoredSummary[];
   savedAudioLogs: AudioLogMetadata[];
+  // Variant mode props
+  collectionType: CollectionType;
+  onCollectionTypeChange: (type: CollectionType) => void;
+  selectedVariantCategories: VariantCategory[];
+  onToggleVariantCategory: (category: VariantCategory) => void;
 }
+
+// Variant category config for UI
+const VARIANT_CATEGORY_CONFIG: {
+  id: VariantCategory;
+  label: string;
+  icon: typeof Zap;
+  color: string;
+}[] = [
+  { id: 'mega', label: 'Mega', icon: Zap, color: '#8b5cf6' },
+  { id: 'regional', label: 'Regional', icon: Globe, color: '#06b6d4' },
+  { id: 'gmax', label: 'Gigantamax', icon: Crown, color: '#f59e0b' },
+  { id: 'other', label: 'Other', icon: Sparkles, color: '#64748b' },
+];
 
 export const GenerationView: React.FC<GenerationViewProps> = ({
   mode,
@@ -47,6 +71,10 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
   isLoading,
   savedSummaries,
   savedAudioLogs,
+  collectionType,
+  onCollectionTypeChange,
+  selectedVariantCategories,
+  onToggleVariantCategory,
 }) => {
   const filteredPokemon = useMemo(() => {
     let list = pokemonList;
@@ -54,6 +82,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
       list = list.filter(
         p =>
           p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
           p.id.toString().includes(searchQuery)
       );
     }
@@ -79,6 +108,15 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
     { value: WorkflowMode.SUMMARY_ONLY, label: 'Summaries', icon: FileText, desc: 'Text only' },
     { value: WorkflowMode.AUDIO_ONLY, label: 'Audio', icon: Mic, desc: 'From saved summaries' },
   ];
+
+  // Get variant category badge color
+  const getVariantBadgeStyle = (category: VariantCategory) => {
+    const config = VARIANT_CATEGORY_CONFIG.find(c => c.id === category);
+    return {
+      background: config?.color || 'var(--text-tertiary)',
+      color: '#fff',
+    };
+  };
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -106,17 +144,50 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
         </div>
       )}
 
+      {/* Collection Type Toggle */}
+      <div className="mb-6 flex justify-center gap-2">
+        <button
+          onClick={() => onCollectionTypeChange('generation')}
+          className="flex items-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all"
+          style={{
+            background:
+              collectionType === 'generation' ? 'var(--accent-primary)' : 'var(--surface-card)',
+            borderColor:
+              collectionType === 'generation' ? 'var(--accent-primary)' : 'var(--border-primary)',
+            color: collectionType === 'generation' ? 'var(--text-inverse)' : 'var(--text-primary)',
+          }}
+        >
+          <Layers className="h-4 w-4" />
+          Generations
+        </button>
+        <button
+          onClick={() => onCollectionTypeChange('variants')}
+          className="flex items-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all"
+          style={{
+            background:
+              collectionType === 'variants' ? 'var(--accent-primary)' : 'var(--surface-card)',
+            borderColor:
+              collectionType === 'variants' ? 'var(--accent-primary)' : 'var(--border-primary)',
+            color: collectionType === 'variants' ? 'var(--text-inverse)' : 'var(--text-primary)',
+          }}
+        >
+          <Sparkles className="h-4 w-4" />
+          Variant Forms
+        </button>
+      </div>
+
       <div
         className="mb-8 rounded-xl border-2 p-8 shadow-sm"
         style={{ background: 'var(--surface-card)', borderColor: 'var(--border-primary)' }}
       >
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {/* Generation selector - visible in BOTH modes */}
           <div className="space-y-2">
             <label
               className="text-xs font-semibold tracking-wide uppercase"
               style={{ color: 'var(--text-tertiary)' }}
             >
-              Region Era
+              {collectionType === 'generation' ? 'Region Era' : 'Source Generation'}
             </label>
             <select
               value={selectedGenId}
@@ -130,6 +201,38 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
               ))}
             </select>
           </div>
+
+          {/* Variant category selector - only in variant mode */}
+          {collectionType === 'variants' && (
+            <div className="space-y-2 lg:col-span-2">
+              <label
+                className="text-xs font-semibold tracking-wide uppercase"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                Variant Types
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {VARIANT_CATEGORY_CONFIG.map(({ id, label, icon: Icon, color }) => {
+                  const isSelected = selectedVariantCategories.includes(id);
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => onToggleVariantCategory(id)}
+                      className="flex items-center gap-1.5 rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all"
+                      style={{
+                        background: isSelected ? color : 'var(--surface-card)',
+                        borderColor: isSelected ? color : 'var(--border-primary)',
+                        color: isSelected ? '#fff' : 'var(--text-secondary)',
+                      }}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {mode !== WorkflowMode.SUMMARY_ONLY && (
             <div className="space-y-2">
@@ -153,37 +256,42 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
             </div>
           )}
 
-          <div className="space-y-2">
-            <label
-              className="text-xs font-semibold tracking-wide uppercase"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              Start ID
-            </label>
-            <input
-              type="number"
-              value={rangeStart}
-              onChange={e => onRangeChange(parseInt(e.target.value) || 1, rangeEnd)}
-              disabled={selectedIds.size > 0}
-              className="input h-14 disabled:opacity-50"
-            />
-          </div>
+          {/* Range controls - only in generation mode */}
+          {collectionType === 'generation' && (
+            <>
+              <div className="space-y-2">
+                <label
+                  className="text-xs font-semibold tracking-wide uppercase"
+                  style={{ color: 'var(--text-tertiary)' }}
+                >
+                  Start ID
+                </label>
+                <input
+                  type="number"
+                  value={rangeStart}
+                  onChange={e => onRangeChange(parseInt(e.target.value) || 1, rangeEnd)}
+                  disabled={selectedIds.size > 0}
+                  className="input h-14 disabled:opacity-50"
+                />
+              </div>
 
-          <div className="space-y-2">
-            <label
-              className="text-xs font-semibold tracking-wide uppercase"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              End ID
-            </label>
-            <input
-              type="number"
-              value={rangeEnd}
-              onChange={e => onRangeChange(rangeStart, parseInt(e.target.value) || 1)}
-              disabled={selectedIds.size > 0}
-              className="input h-14 disabled:opacity-50"
-            />
-          </div>
+              <div className="space-y-2">
+                <label
+                  className="text-xs font-semibold tracking-wide uppercase"
+                  style={{ color: 'var(--text-tertiary)' }}
+                >
+                  End ID
+                </label>
+                <input
+                  type="number"
+                  value={rangeEnd}
+                  onChange={e => onRangeChange(rangeStart, parseInt(e.target.value) || 1)}
+                  disabled={selectedIds.size > 0}
+                  className="input h-14 disabled:opacity-50"
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex flex-col items-end gap-4 md:flex-row">
@@ -261,6 +369,8 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
               const isSelected = selectedIds.has(p.id);
               const hasSavedSummary = savedSummaryIds.has(p.id);
               const hasSavedAudio = savedAudioIds.has(p.id);
+              const isVariant = !p.isDefault;
+
               return (
                 <div
                   key={p.id}
@@ -285,22 +395,60 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
                       </span>
                     )}
                   </div>
+
+                  {/* Variant badge - positioned bottom right */}
+                  {isVariant && (
+                    <div className="absolute top-1 right-2">
+                      <span
+                        className="rounded px-1.5 py-0.5 text-[8px] font-bold uppercase"
+                        style={getVariantBadgeStyle(p.variantCategory)}
+                        title={p.variantCategory}
+                      >
+                        {p.variantCategory === 'mega' && 'M'}
+                        {p.variantCategory === 'regional' && 'R'}
+                        {p.variantCategory === 'gmax' && 'G'}
+                        {p.variantCategory === 'other' && '•'}
+                      </span>
+                    </div>
+                  )}
+
                   <span
                     className="text-[9px] font-semibold tracking-wide"
-                    style={{ color: isSelected ? 'var(--accent-primary)' : 'var(--text-tertiary)' }}
+                    style={{
+                      color: isSelected ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                      display: 'block',
+                    }}
                   >
-                    #{formatPokemonId(p.id)}
+                    #{formatPokemonId(isVariant ? p.speciesId : p.id)}
                   </span>
                   <h4
-                    className="mt-1 truncate text-xs font-medium capitalize"
+                    className="mt-1 truncate text-xs font-medium"
                     style={{ color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)' }}
+                    title={p.displayName}
                   >
-                    {p.name}
+                    {p.displayName}
                   </h4>
                 </div>
               );
             })}
       </div>
+
+      {/* Empty state for variants */}
+      {collectionType === 'variants' && !isLoading && filteredPokemon.length === 0 && (
+        <div
+          className="rounded-xl border-2 p-12 text-center"
+          style={{ background: 'var(--surface-card)', borderColor: 'var(--border-primary)' }}
+        >
+          <Sparkles className="mx-auto mb-4 h-12 w-12" style={{ color: 'var(--text-tertiary)' }} />
+          <h3 className="mb-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Select Variant Types
+          </h3>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Choose one or more variant categories above to browse Mega Evolutions, Regional Forms,
+            Gigantamax Pokémon, and more.
+          </p>
+        </div>
+      )}
     </div>
   );
 };

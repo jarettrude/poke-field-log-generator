@@ -17,6 +17,16 @@ interface UseJobPollingProps {
   onJobCanceled?: () => void;
 }
 
+interface ProgressState {
+  current: number;
+  total: number;
+  message: string;
+  stage: 'summary' | 'audio';
+  currentPokemonId?: number;
+  currentPokemonName?: string;
+  currentPokemonImage?: string;
+}
+
 export function useJobPolling({
   onJobComplete,
   onJobFailed,
@@ -26,14 +36,17 @@ export function useJobPolling({
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [progress, setProgress] = useState<{
-    current: number;
-    total: number;
-    message: string;
-    stage: 'summary' | 'audio';
-  }>({ current: 0, total: 0, message: '', stage: 'summary' });
+  const [progress, setProgress] = useState<ProgressState>({
+    current: 0,
+    total: 0,
+    message: '',
+    stage: 'summary',
+  });
   const [cooldown, setCooldown] = useState<CooldownState | null>(null);
   const pollTimer = useRef<number | null>(null);
+  const pokemonDataCache = useRef<Map<number, { imageUrl?: string; displayName?: string }>>(
+    new Map()
+  );
 
   const clearPoll = useCallback(() => {
     if (pollTimer.current) {
@@ -42,9 +55,50 @@ export function useJobPolling({
     }
   }, []);
 
+  const fetchPokemonData = useCallback(
+    async (pokemonId: number): Promise<{ imageUrl?: string; displayName?: string }> => {
+      // Check cache first
+      if (pokemonDataCache.current.has(pokemonId)) {
+        return pokemonDataCache.current.get(pokemonId)!;
+      }
+
+      try {
+        const response = await fetch(`/api/pokemon/${pokemonId}`);
+        const result = (await response.json().catch(() => null)) as {
+          success: boolean;
+          data?: {
+            imagePngPath?: string | null;
+            imageSvgPath?: string | null;
+            name?: string;
+            displayName?: string;
+          };
+        } | null;
+
+        const imageUrl = result?.data?.imagePngPath || result?.data?.imageSvgPath || undefined;
+        const displayName = result?.data?.displayName || result?.data?.name || undefined;
+
+        if (imageUrl || displayName) {
+          pokemonDataCache.current.set(pokemonId, { imageUrl, displayName });
+        }
+        return { imageUrl, displayName };
+      } catch {
+        return {};
+      }
+    },
+    []
+  );
+
+  const extractPokemonName = (message: string): string | undefined => {
+    // Try to extract Pokemon name from message like "Generating summary for #1 Bulbasaur..."
+    // or "Synthesizing audio for #1 bulbasaur..."
+    const match = message.match(/#\d+\s+(\w+)/i);
+    return match?.[1];
+  };
+
   const buildResultsForJob = async (job: {
     generationId: number;
     pokemonIds: number[];
+    mode: 'FULL' | 'SUMMARY_ONLY' | 'AUDIO_ONLY';
   }): Promise<ProcessedPokemon[]> => {
     const [summaries, audioLogsMeta] = await Promise.all([
       getSummariesByGeneration(job.generationId),
@@ -57,12 +111,19 @@ export function useJobPolling({
     const results: ProcessedPokemon[] = [];
     for (const id of job.pokemonIds) {
       const summary = summaryById.get(id);
-      const hasAudio = audioMetaIds.has(id);
-      if (!summary || !hasAudio) continue;
+      if (!summary) continue;
 
-      // Fetch full audio data (with audioBase64) for results
-      const audio = await getAudioLog(id);
-      if (!audio) continue;
+      // For SUMMARY_ONLY mode, audio is not required
+      const hasAudio = audioMetaIds.has(id);
+      const requiresAudio = job.mode !== 'SUMMARY_ONLY';
+      if (requiresAudio && !hasAudio) continue;
+
+      // Fetch audio data only if we have audio
+      let audioData = '';
+      if (hasAudio) {
+        const audio = await getAudioLog(id);
+        audioData = audio?.audioBase64 || '';
+      }
 
       const cachedPokemonRes = await fetch(`/api/pokemon/${id}`);
       const response = (await cachedPokemonRes.json().catch(() => null)) as {
@@ -70,6 +131,8 @@ export function useJobPolling({
         data?: {
           imagePngPath?: string | null;
           imageSvgPath?: string | null;
+          displayName?: string;
+          variantCategory?: string;
         };
       } | null;
 
@@ -78,8 +141,9 @@ export function useJobPolling({
       results.push({
         id,
         name: summary.name,
+        displayName: cachedPokemon?.displayName,
         summary: summary.summary,
-        audioData: audio.audioBase64,
+        audioData: audioData,
         pngData: cachedPokemon?.imagePngPath || null,
         svgData: cachedPokemon?.imageSvgPath || null,
       });
@@ -103,16 +167,15 @@ export function useJobPolling({
         );
         setIsPaused(job.status === 'paused');
 
-        setProgress({
-          current: job.current,
-          total: job.total,
-          message: job.message,
-          stage: job.stage,
-        });
+        // Get current Pokemon ID from the pokemonIds array
+        const currentPokemonId = job.pokemonIds[job.current] || job.pokemonIds[job.current - 1];
 
+        // Determine if we're in cooldown
+        let isInCooldown = false;
         if (job.cooldownUntil) {
           const remainingMs = Math.max(0, new Date(job.cooldownUntil).getTime() - Date.now());
           if (remainingMs > 0) {
+            isInCooldown = true;
             setCooldown({ active: true, remainingMs, flavorText: '' });
           } else {
             setCooldown(null);
@@ -120,6 +183,26 @@ export function useJobPolling({
         } else {
           setCooldown(null);
         }
+
+        // Fetch Pokemon data (only if not in cooldown)
+        let currentPokemonImage: string | undefined;
+        let currentPokemonName: string | undefined;
+        if (currentPokemonId && !isInCooldown) {
+          const pokemonData = await fetchPokemonData(currentPokemonId);
+          currentPokemonImage = pokemonData.imageUrl;
+          // Prefer displayName from cache, fall back to message extraction
+          currentPokemonName = pokemonData.displayName || extractPokemonName(job.message);
+        }
+
+        setProgress({
+          current: job.current,
+          total: job.total,
+          message: job.message,
+          stage: job.stage,
+          currentPokemonId: isInCooldown ? undefined : currentPokemonId,
+          currentPokemonName: isInCooldown ? undefined : currentPokemonName,
+          currentPokemonImage: isInCooldown ? undefined : currentPokemonImage,
+        });
 
         if (job.status === 'failed') {
           clearPoll();
@@ -150,13 +233,12 @@ export function useJobPolling({
           setIsProcessing(false);
           setCooldown(null);
 
-          // We don't load saved summaries/audio here directly as that's app state,
-          // but we can optionally return results if needed.
-
-          let results: ProcessedPokemon[] = [];
-          if (job.mode !== 'SUMMARY_ONLY') {
-            results = await buildResultsForJob(job);
-          }
+          // Build results for all modes so they can be displayed in ResultsView
+          const results = await buildResultsForJob({
+            generationId: job.generationId,
+            pokemonIds: job.pokemonIds,
+            mode: job.mode,
+          });
 
           onJobComplete?.(results, job.mode);
         }
@@ -171,7 +253,15 @@ export function useJobPolling({
     return () => {
       clearPoll();
     };
-  }, [activeJobId, showToast, onJobComplete, onJobFailed, onJobCanceled, clearPoll]);
+  }, [
+    activeJobId,
+    showToast,
+    onJobComplete,
+    onJobFailed,
+    onJobCanceled,
+    clearPoll,
+    fetchPokemonData,
+  ]);
 
   return {
     activeJobId,

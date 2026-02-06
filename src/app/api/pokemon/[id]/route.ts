@@ -2,6 +2,7 @@ import { getDatabase } from '@/lib/db/adapter';
 import fs from 'fs/promises';
 import path from 'path';
 import { successResponse, errorResponse, parseId } from '@/lib/server/api';
+import { VariantCategory } from '@/types';
 
 export const runtime = 'nodejs';
 
@@ -73,6 +74,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     const {
       name,
+      displayName,
       height,
       weight,
       types,
@@ -83,6 +85,11 @@ export async function POST(request: Request, { params }: RouteParams) {
       imageSvgUrl,
       generationId,
       region,
+      speciesId,
+      isDefault,
+      formName,
+      variantCategory,
+      regionName,
     } = body;
 
     if (
@@ -112,6 +119,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     await db.cachePokemon({
       id: pokemonId,
       name,
+      displayName: displayName || name,
       height,
       weight,
       types,
@@ -122,6 +130,11 @@ export async function POST(request: Request, { params }: RouteParams) {
       imageSvgPath,
       generationId,
       region,
+      speciesId: speciesId ?? pokemonId,
+      isDefault: isDefault ?? true,
+      formName: formName ?? null,
+      variantCategory: (variantCategory as VariantCategory) ?? 'default',
+      regionName: regionName ?? null,
     });
 
     return successResponse({

@@ -225,7 +225,11 @@ export async function generateTts(params: { text: string; voiceName: string }): 
     }
 
     const mimeType = inlineData.mimeType ?? 'unknown';
-    if (mimeType !== 'unknown' && !mimeType.startsWith('audio/L16') && !mimeType.startsWith('audio/pcm')) {
+    if (
+      mimeType !== 'unknown' &&
+      !mimeType.startsWith('audio/L16') &&
+      !mimeType.startsWith('audio/pcm')
+    ) {
       console.warn(`Unexpected TTS mimeType: ${mimeType}. Expected audio/L16 or audio/pcm.`);
     }
 
