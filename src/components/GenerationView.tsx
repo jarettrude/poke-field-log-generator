@@ -375,7 +375,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
                 <div
                   key={p.id}
                   onClick={() => onToggleSelection(p.id)}
-                  className="group relative cursor-pointer rounded-lg border-2 p-3.5 transition-all hover:shadow-md"
+                  className="group relative cursor-pointer rounded-lg border-2 px-3.5 py-2 transition-all hover:shadow-md"
                   style={{
                     background: isSelected ? 'var(--bg-secondary)' : 'var(--surface-card)',
                     borderColor: isSelected ? 'var(--accent-primary)' : 'var(--border-primary)',
@@ -398,7 +398,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
 
                   {/* Variant badge - positioned bottom right */}
                   {isVariant && (
-                    <div className="absolute top-1 right-2">
+                    <div className="mb-0.5">
                       <span
                         className="rounded px-1.5 py-0.5 text-[8px] font-bold uppercase"
                         style={getVariantBadgeStyle(p.variantCategory)}

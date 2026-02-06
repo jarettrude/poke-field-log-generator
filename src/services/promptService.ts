@@ -84,7 +84,8 @@ const getStoredOverrides = async (): Promise<Partial<PromptConfig>> => {
     const response = await fetch(API_BASE);
     if (!response.ok) return {};
 
-    const prompts = await response.json();
+    const json = await response.json();
+    const prompts = json.data || [];
     const overrides: Partial<PromptConfig> = {};
 
     prompts.forEach((prompt: { type: string; content: string }) => {
@@ -176,7 +177,8 @@ export const clearPromptOverride = async (type: PromptType): Promise<void> => {
 export const clearAllPromptOverrides = async (): Promise<void> => {
   try {
     const response = await fetch(API_BASE);
-    const prompts = await response.json();
+    const json = await response.json();
+    const prompts = json.data || [];
 
     for (const prompt of prompts) {
       await fetch(`${API_BASE}?type=${prompt.type}`, { method: 'DELETE' });
