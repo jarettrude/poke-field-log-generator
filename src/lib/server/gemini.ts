@@ -7,11 +7,11 @@ import type { PokemonDetails } from '@/types';
 import { getActivePrompt } from './prompts';
 
 const MAX_RETRIES = 4;
-const MAX_RETRIES_TTS = 5;
+const MAX_RETRIES_TTS = 1;
 
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_MAX_MS = 64000;
-const RATE_LIMIT_BASE_MS = 15000;
+const RATE_LIMIT_BASE_MS = 30000;
 const RATE_LIMIT_MAX_MS = 120000;
 
 /**
@@ -187,11 +187,14 @@ export async function generateSummary(details: PokemonDetails, region: string): 
 /**
  * Generate TTS audio from text using Gemini. Returns base64-encoded PCM audio.
  *
- * Strategy: Start with gemini-2.5-pro-preview-tts with retry/backoff for transient errors.
- * If Pro hits daily quota exhaustion OR exhausts all retries, fall back to gemini-2.5-flash-preview-tts.
+ * Strategy: Pro first with 1 retry, then Flash fallback with 1 retry.
+ * Max 4 API calls per Pokémon (1+1 Pro, 1+1 Flash).
  *
- * Daily quota exhaustion (RPD) is detected and triggers IMMEDIATE fallback (no retries).
- * Transient rate limits (RPM) will retry with exponential backoff.
+ * Daily quota exhaustion (RPD) triggers IMMEDIATE fallback (no retries).
+ * Transient rate limits (RPM) retry with exponential backoff (30s base).
+ *
+ * Budget: Pro has 50 RPD, Flash has 100 RPD. Every call counts.
+ * The jobRunner does NOT add its own retry layer on top of this.
  */
 export async function generateTts(params: { text: string; voiceName: string }): Promise<string> {
   const ai = getClient();

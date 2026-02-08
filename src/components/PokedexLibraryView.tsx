@@ -5,7 +5,6 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
-  Volume2,
   FileText,
   Sparkles,
   X,
@@ -17,7 +16,9 @@ import {
   Loader2,
   Pencil,
   Save,
+  Volume2,
 } from 'lucide-react';
+import { VOICE_OPTIONS } from '../constants';
 import {
   StoredSummary,
   AudioLogMetadata,
@@ -160,6 +161,10 @@ interface PokedexLibraryViewProps {
   onRefresh: () => void;
   onDeleteSummaries?: (ids: number[]) => Promise<void>;
   onDeleteAudio?: (ids: number[]) => Promise<void>;
+  onGenerateAudio?: (ids: number[]) => void;
+  isGenerating?: boolean;
+  selectedVoice?: string;
+  onVoiceChange?: (voice: string) => void;
 }
 
 export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
@@ -168,6 +173,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   onRefresh,
   onDeleteSummaries,
   onDeleteAudio,
+  onGenerateAudio,
+  isGenerating,
+  selectedVoice,
+  onVoiceChange,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [generationFilter, setGenerationFilter] = useState<number | 'all'>('all');
@@ -633,61 +642,110 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-6">
-      {/* Compact Header */}
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
+      {/* Header */}
+      <div className="mb-4">
+        <div className="mb-3">
+          <h1 className="text-xl font-bold sm:text-2xl" style={{ color: 'var(--text-primary)' }}>
             Pokédex Library
           </h1>
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             {entries.length} entries • {selectedIds.size} selected
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {selectedIds.size > 0 && onDeleteSummaries && (
+
+        {/* Action buttons - grid for equal sizing on mobile */}
+        {selectedIds.size > 0 && (
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-2">
+            {onDeleteSummaries && (
+              <button
+                onClick={handleDeleteSummaries}
+                disabled={isDeleting}
+                className="btn btn-outline py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
+              >
+                <Trash2 className="h-4 w-4 shrink-0" />
+                <span className="truncate">Delete Text</span>
+              </button>
+            )}
+            {onDeleteAudio && (
+              <button
+                onClick={handleDeleteAudio}
+                disabled={isDeleting}
+                className="btn btn-outline py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                style={{ borderColor: '#d97706', color: '#d97706' }}
+              >
+                <Trash2 className="h-4 w-4 shrink-0" />
+                <span className="truncate">Delete Audio</span>
+              </button>
+            )}
+            {onDeleteSummaries && onDeleteAudio && (
+              <button
+                onClick={handleDeleteBoth}
+                disabled={isDeleting}
+                className="btn btn-outline py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                style={{ borderColor: 'var(--text-tertiary)', color: 'var(--text-tertiary)' }}
+              >
+                <Trash2 className="h-4 w-4 shrink-0" />
+                <span className="truncate">Delete Both</span>
+              </button>
+            )}
             <button
-              onClick={handleDeleteSummaries}
-              disabled={isDeleting}
-              className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)' }}
+              onClick={handleDownload}
+              disabled={selectedIds.size === 0}
+              className="btn btn-primary py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
             >
-              <Trash2 className="h-4 w-4" />
-              Delete Text
+              <Download className="h-4 w-4 shrink-0" />
+              <span className="truncate">Download</span>
             </button>
-          )}
-          {selectedIds.size > 0 && onDeleteAudio && (
-            <button
-              onClick={handleDeleteAudio}
-              disabled={isDeleting}
-              className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ borderColor: '#d97706', color: '#d97706' }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Audio
-            </button>
-          )}
-          {selectedIds.size > 0 && onDeleteSummaries && onDeleteAudio && (
-            <button
-              onClick={handleDeleteBoth}
-              disabled={isDeleting}
-              className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
-              style={{ borderColor: 'var(--text-tertiary)', color: 'var(--text-tertiary)' }}
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Both
-            </button>
-          )}
-          <button
-            onClick={handleDownload}
-            disabled={selectedIds.size === 0}
-            className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Download className="h-4 w-4" />
-            Download
-          </button>
-        </div>
+          </div>
+        )}
       </div>
+
+      {/* Audio generation row */}
+      {selectedIds.size > 0 &&
+        onGenerateAudio &&
+        (() => {
+          const selectedWithText = entries.filter(
+            e => selectedIds.has(e.id) && !!e.summary && !e.hasAudio
+          );
+          if (selectedWithText.length === 0) return null;
+          return (
+            <div className="mb-4 grid grid-cols-[1fr_auto] gap-2 sm:flex sm:items-center sm:justify-end sm:gap-2">
+              {onVoiceChange && selectedVoice && (
+                <select
+                  value={selectedVoice}
+                  onChange={e => onVoiceChange(e.target.value)}
+                  className="select h-10 text-xs sm:w-auto"
+                  disabled={isGenerating}
+                >
+                  {VOICE_OPTIONS.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                onClick={() => onGenerateAudio(selectedWithText.map(e => e.id))}
+                disabled={isGenerating || isDeleting}
+                className="btn py-2 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  background: 'var(--accent-secondary)',
+                  color: 'var(--text-inverse)',
+                  borderColor: 'var(--accent-secondary)',
+                }}
+              >
+                {isGenerating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Volume2 className="h-4 w-4" />
+                )}
+                {isGenerating ? 'Generating...' : `Generate Audio (${selectedWithText.length})`}
+              </button>
+            </div>
+          );
+        })()}
 
       {/* Compact Filters Grid */}
       <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">

@@ -208,38 +208,10 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
       message: `Synthesizing audio for #${summary.id} ${summary.name}...`,
     });
 
-    let audioData = '';
-    let retryCount = 0;
-    let success = false;
-
-    while (!success && retryCount < MAX_RETRIES) {
-      try {
-        audioData = await generateTts({
-          text: summary.summary,
-          voiceName: job.voice,
-        });
-        success = true;
-      } catch (error) {
-        retryCount++;
-
-        if (retryCount >= MAX_RETRIES) {
-          throw error;
-        }
-
-        const backoffMs = RETRY_BASE_DELAY_MS * Math.pow(2, retryCount - 1);
-        await setProgress({
-          jobId: job.id,
-          stage: 'audio',
-          current: idx,
-          total,
-          message: `TTS error on #${summary.id}, retrying in ${Math.round(backoffMs / 1000)}s... (${retryCount}/${MAX_RETRIES})`,
-        });
-
-        await db.incrementJobRetry(job.id);
-        const result = await sleepWithJobControl(job.id, backoffMs);
-        if (result !== 'ok') return result;
-      }
-    }
+    const audioData = await generateTts({
+      text: summary.summary,
+      voiceName: job.voice,
+    });
 
     const mp3Data = await convertPcmToMp3(
       audioData,

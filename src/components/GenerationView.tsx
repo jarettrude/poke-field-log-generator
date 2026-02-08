@@ -119,25 +119,25 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
       {/* Mode Selection */}
       {onModeChange && (
-        <div className="mb-6 flex flex-wrap justify-center gap-3">
+        <div className="mb-6 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-3">
           {modeOptions.map(({ value, label, icon: Icon, desc }) => (
             <button
               key={value}
               onClick={() => onModeChange(value)}
-              className="flex items-center gap-3 rounded-xl border-2 px-5 py-3 transition-all"
+              className="flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 transition-all sm:justify-start sm:gap-3 sm:px-5"
               style={{
                 background: mode === value ? 'var(--accent-primary)' : 'var(--surface-card)',
                 borderColor: mode === value ? 'var(--accent-primary)' : 'var(--border-primary)',
                 color: mode === value ? 'var(--text-inverse)' : 'var(--text-primary)',
               }}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-5 w-5 shrink-0" />
               <div className="text-left">
-                <div className="font-semibold">{label}</div>
-                <div className="text-xs opacity-75">{desc}</div>
+                <div className="text-sm font-semibold sm:text-base">{label}</div>
+                <div className="hidden text-xs opacity-75 sm:block">{desc}</div>
               </div>
             </button>
           ))}
@@ -145,10 +145,10 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
       )}
 
       {/* Collection Type Toggle */}
-      <div className="mb-6 flex justify-center gap-2">
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:flex sm:justify-center sm:gap-2">
         <button
           onClick={() => onCollectionTypeChange('generation')}
-          className="flex items-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all"
+          className="flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all"
           style={{
             background:
               collectionType === 'generation' ? 'var(--accent-primary)' : 'var(--surface-card)',
@@ -157,12 +157,12 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
             color: collectionType === 'generation' ? 'var(--text-inverse)' : 'var(--text-primary)',
           }}
         >
-          <Layers className="h-4 w-4" />
+          <Layers className="h-4 w-4 shrink-0" />
           Generations
         </button>
         <button
           onClick={() => onCollectionTypeChange('variants')}
-          className="flex items-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all"
+          className="flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all"
           style={{
             background:
               collectionType === 'variants' ? 'var(--accent-primary)' : 'var(--surface-card)',
@@ -171,16 +171,16 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
             color: collectionType === 'variants' ? 'var(--text-inverse)' : 'var(--text-primary)',
           }}
         >
-          <Sparkles className="h-4 w-4" />
+          <Sparkles className="h-4 w-4 shrink-0" />
           Variant Forms
         </button>
       </div>
 
       <div
-        className="mb-8 rounded-xl border-2 p-8 shadow-sm"
+        className="mb-8 rounded-xl border-2 p-4 shadow-sm sm:p-8"
         style={{ background: 'var(--surface-card)', borderColor: 'var(--border-primary)' }}
       >
-        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:mb-8 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
           {/* Generation selector - visible in BOTH modes */}
           <div className="space-y-2">
             <label
@@ -294,7 +294,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
           )}
         </div>
 
-        <div className="flex flex-col items-end gap-4 md:flex-row">
+        <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-end">
           <div className="flex-1 space-y-2">
             <label
               className="text-xs font-semibold tracking-wide uppercase"

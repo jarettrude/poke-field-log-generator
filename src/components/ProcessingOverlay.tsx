@@ -52,12 +52,12 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-auto p-6 backdrop-blur-md"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-auto p-4 backdrop-blur-md sm:p-6"
       style={{ background: 'var(--surface-overlay)' }}
     >
-      <div className="w-full max-w-2xl space-y-8 text-center">
+      <div className="w-full max-w-2xl space-y-6 text-center sm:space-y-8">
         {/* Animated Pokemon/Pokeball Image */}
-        <div className="relative mx-auto inline-flex h-36 w-36 items-center justify-center">
+        <div className="relative mx-auto inline-flex h-28 w-28 items-center justify-center sm:h-36 sm:w-36">
           <div
             className={`absolute inset-0 rounded-full border-4 shadow-lg ${!isPaused && !cooldown?.active ? 'animate-spin' : 'opacity-30'}`}
             style={{
@@ -97,7 +97,10 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
             </span>
           </div>
 
-          <h2 className="min-h-8 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          <h2
+            className="min-h-8 text-lg font-bold sm:text-2xl"
+            style={{ color: 'var(--text-primary)' }}
+          >
             {isPaused ? 'Paused' : cooldown?.active ? 'Cooling down…' : progress.message}
           </h2>
 
@@ -155,7 +158,7 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
         </div>
 
         {/* Controls */}
-        <div className="flex justify-center gap-4">
+        <div className="flex justify-center gap-3 sm:gap-4">
           <button onClick={isPaused ? onResume : onPause} className="btn btn-secondary">
             {isPaused ? 'Resume' : 'Pause'}
           </button>

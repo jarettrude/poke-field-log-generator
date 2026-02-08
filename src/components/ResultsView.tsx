@@ -14,13 +14,13 @@ interface ResultsViewProps {
 
 export const ResultsView: React.FC<ResultsViewProps> = ({ results, onClear, onBack }) => {
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
       {/* Success Header */}
       <div
         className="mb-8 rounded-xl border-2 p-6"
         style={{ background: 'var(--surface-card)', borderColor: 'var(--accent-secondary)' }}
       >
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <div
               className="flex h-12 w-12 items-center justify-center rounded-full"
@@ -38,7 +38,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({ results, onClear, onBa
               </p>
             </div>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             <button onClick={onBack} className="btn btn-secondary">
               <ArrowLeft className="h-4 w-4" />
               New Mission
