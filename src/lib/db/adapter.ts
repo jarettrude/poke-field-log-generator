@@ -202,23 +202,27 @@ export async function getDatabaseAdapter(): Promise<DatabaseAdapter> {
   return new SQLiteAdapter();
 }
 
-// Singleton instance
-let dbInstance: DatabaseAdapter | null = null;
-let dbInitPromise: Promise<DatabaseAdapter> | null = null;
+// Singleton instance stored on globalThis to survive Next.js module re-evaluation / HMR.
+// Without this, Turbopack can create separate module instances per route bundle,
+// each with its own dbInstance → double DB initialization and double connections.
+const globalDb = globalThis as unknown as {
+  __dbInstance?: DatabaseAdapter;
+  __dbInitPromise?: Promise<DatabaseAdapter>;
+};
 
 export async function getDatabase(): Promise<DatabaseAdapter> {
-  if (dbInstance) {
-    return dbInstance;
+  if (globalDb.__dbInstance) {
+    return globalDb.__dbInstance;
   }
 
-  if (!dbInitPromise) {
-    dbInitPromise = (async () => {
+  if (!globalDb.__dbInitPromise) {
+    globalDb.__dbInitPromise = (async () => {
       const adapter = await getDatabaseAdapter();
       await adapter.initialize();
-      dbInstance = adapter;
+      globalDb.__dbInstance = adapter;
       return adapter;
     })();
   }
 
-  return dbInitPromise;
+  return globalDb.__dbInitPromise;
 }
