@@ -1,3 +1,8 @@
+/**
+ * Header component with navigation and theme switching.
+ * Provides responsive navigation for desktop and mobile views.
+ */
+
 'use client';
 
 import React, { useState } from 'react';
@@ -49,7 +54,6 @@ export const Header: React.FC = () => {
       style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-elevated)' }}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-        {/* Logo - simplified on mobile */}
         <Link href="/" className="flex items-center gap-3">
           <div
             className="flex h-12 w-12 items-center justify-center rounded-xl shadow-lg"
@@ -57,7 +61,6 @@ export const Header: React.FC = () => {
           >
             <BookMarked className="h-6 w-6" style={{ color: 'var(--text-inverse)' }} />
           </div>
-          {/* Hide text on mobile, show on md+ */}
           <div className="hidden md:block">
             <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
               Field Logs
@@ -68,7 +71,6 @@ export const Header: React.FC = () => {
           </div>
         </Link>
 
-        {/* Desktop Navigation */}
         <nav className="hidden items-center gap-2 md:flex">
           {navItems.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href;
@@ -91,7 +93,6 @@ export const Header: React.FC = () => {
           </button>
         </nav>
 
-        {/* Mobile Menu Button */}
         <div className="flex items-center gap-2 md:hidden">
           <button onClick={cycleTheme} className="btn btn-ghost" title={`Theme: ${theme}`}>
             <ThemeIcon className="h-4 w-4" />
@@ -106,7 +107,6 @@ export const Header: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Navigation Dropdown */}
       {mobileMenuOpen && (
         <div
           className="border-t-2 md:hidden"

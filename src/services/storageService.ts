@@ -14,12 +14,10 @@ interface ApiResponse<T> {
 async function handleResponse<T>(response: Response): Promise<T> {
   const result = (await response.json()) as ApiResponse<T>;
 
-  // If explicitly failed or if data is missing when success is true (though data can be null for 404s logic below)
   if (!result.success) {
     throw new Error(result.error || 'Unknown API error');
   }
 
-  // Cast data as T (it might be undefined if the API returns void success response, but T should match)
   return result.data as T;
 }
 
@@ -104,8 +102,6 @@ export const saveSummary = async (summary: SummaryInput): Promise<void> => {
 export const getSummary = async (id: number): Promise<StoredSummary | null> => {
   const response = await fetch(`${API_BASE}/summaries/${id}`);
 
-  // The standardized API returns success: false, error: 'Summary not found' with 404
-  // We need to handle this specific case to return null as expected by the frontend
   const result = (await response.json()) as ApiResponse<StoredSummary>;
 
   if (!result.success) {

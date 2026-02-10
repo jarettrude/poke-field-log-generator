@@ -1,3 +1,8 @@
+/**
+ * Job service for managing background processing jobs.
+ * Provides API client functions for creating, monitoring, and controlling jobs.
+ */
+
 import { ProcessingJob as DBProcessingJob } from '@/lib/db/adapter';
 
 const API_BASE = '/api/jobs';
@@ -5,7 +10,6 @@ const API_BASE = '/api/jobs';
 export type ProcessingStage = 'summary' | 'audio';
 export type JobStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'canceled';
 
-// Re-export the type from the DB adapter to ensure consistency
 export type ProcessingJob = DBProcessingJob;
 
 interface ApiResponse<T> {

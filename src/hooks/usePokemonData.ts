@@ -1,3 +1,8 @@
+/**
+ * Custom hook for managing Pokemon data and generation/variant selection.
+ * Handles fetching generations, Pokemon lists, and variant categories with caching.
+ */
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   fetchGenerations,
@@ -16,7 +21,6 @@ export function usePokemonData() {
   const [rangeStart, setRangeStart] = useState<number>(1);
   const [rangeEnd, setRangeEnd] = useState<number>(151);
 
-  // Variant mode state
   const [collectionType, setCollectionType] = useState<CollectionType>('generation');
   const [selectedVariantCategories, setSelectedVariantCategories] = useState<VariantCategory[]>([
     'mega',
@@ -24,10 +28,8 @@ export function usePokemonData() {
     'gmax',
   ]);
 
-  // Track if initial load complete
   const initialLoadRef = useRef(false);
 
-  // Initialize generations
   useEffect(() => {
     const init = async () => {
       const gens = await fetchGenerations();
@@ -58,7 +60,6 @@ export function usePokemonData() {
     init();
   }, []);
 
-  // Fetch variants for the current generation and selected categories
   const fetchVariantsForCurrentGen = useCallback(
     async (genId: number, categories: VariantCategory[]) => {
       if (categories.length === 0) {
@@ -68,16 +69,13 @@ export function usePokemonData() {
 
       setIsLoading(true);
       try {
-        // Fetch only variants for this generation (fast!)
         const variants = await fetchVariantsByCategory(categories, genId);
         setPokemonList(variants);
 
-        // Get the region name for context
         const genInfo = await fetchGenerationWithRegion(genId);
         setCurrentRegion(`${genInfo.region} Variants`);
 
         if (variants.length > 0) {
-          // For variants, use index-based range since IDs can be very large
           setRangeStart(0);
           setRangeEnd(variants.length - 1);
         } else {
@@ -91,7 +89,6 @@ export function usePokemonData() {
     []
   );
 
-  // Handle generation change - works in both modes
   const handleGenChange = useCallback(
     async (genId: number) => {
       setSelectedGenId(genId);
@@ -99,7 +96,6 @@ export function usePokemonData() {
 
       try {
         if (collectionType === 'generation') {
-          // Standard generation mode - fetch base Pokemon
           const [list, genInfo] = await Promise.all([
             fetchPokemonInGeneration(genId),
             fetchGenerationWithRegion(genId),
@@ -113,7 +109,6 @@ export function usePokemonData() {
             setRangeEnd(Math.max(...ids));
           }
         } else {
-          // Variant mode - fetch variants for this generation
           await fetchVariantsForCurrentGen(genId, selectedVariantCategories);
         }
       } finally {
@@ -123,7 +118,6 @@ export function usePokemonData() {
     [collectionType, selectedVariantCategories, fetchVariantsForCurrentGen]
   );
 
-  // Handle variant category change - refetch variants for current generation
   const handleVariantCategoryChange = useCallback(
     async (categories: VariantCategory[]) => {
       setSelectedVariantCategories(categories);
@@ -132,13 +126,11 @@ export function usePokemonData() {
     [selectedGenId, fetchVariantsForCurrentGen]
   );
 
-  // Switch between generation and variant modes
   const handleCollectionTypeChange = useCallback(
     async (type: CollectionType) => {
       setCollectionType(type);
 
       if (type === 'generation') {
-        // Switch to generation mode - reload base Pokemon
         setIsLoading(true);
         try {
           const [list, genInfo] = await Promise.all([
@@ -157,14 +149,12 @@ export function usePokemonData() {
           setIsLoading(false);
         }
       } else {
-        // Switch to variant mode - load variants for current generation
         await fetchVariantsForCurrentGen(selectedGenId, selectedVariantCategories);
       }
     },
     [selectedGenId, selectedVariantCategories, fetchVariantsForCurrentGen]
   );
 
-  // Toggle a variant category
   const toggleVariantCategory = useCallback(
     (category: VariantCategory) => {
       const newCategories = selectedVariantCategories.includes(category)
@@ -176,7 +166,6 @@ export function usePokemonData() {
   );
 
   return {
-    // Generation mode
     generations,
     selectedGenId,
     currentRegion,
@@ -188,7 +177,6 @@ export function usePokemonData() {
     setRangeEnd,
     handleGenChange,
 
-    // Variant mode
     collectionType,
     selectedVariantCategories,
     handleCollectionTypeChange,

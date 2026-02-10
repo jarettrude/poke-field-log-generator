@@ -76,7 +76,6 @@ interface FormResponse {
 // Dynamic Region/Category Detection
 // ============================================================================
 
-// Cache for region names fetched from PokeAPI
 let cachedRegionNames: string[] | null = null;
 
 /**
@@ -112,23 +111,18 @@ export async function categorizeVariant(
 ): Promise<{ category: VariantCategory; regionName: string | null }> {
   if (!formName) return { category: 'default', regionName: null };
 
-  // Check for Mega (using API flag)
   if (isMega) return { category: 'mega', regionName: null };
 
-  // Check for Gigantamax (PokeAPI naming convention)
   if (formName === 'gmax') return { category: 'gmax', regionName: null };
 
-  // Check for regional forms by matching against dynamic region list
   const regions = await getRegionNames();
   for (const region of regions) {
     if (formName.includes(region)) {
-      // Capitalize region name for display
       const regionName = region.charAt(0).toUpperCase() + region.slice(1);
       return { category: 'regional', regionName };
     }
   }
 
-  // Fallback for other forms (Totem, Primal, Origin, etc.)
   return { category: 'other', regionName: null };
 }
 
@@ -147,25 +141,20 @@ export function formatDisplayName(
 
   if (!formName || category === 'default') return capitalizedBase;
 
-  // Regional forms: Use dynamically detected region name
   if (category === 'regional' && regionName) {
-    // "Alola" → "Alolan", "Galar" → "Galarian", etc.
     const adjective = regionName.endsWith('a')
-      ? regionName.slice(0, -1) + 'n' // Alola → Alolan
-      : regionName + 'ian'; // Hisui → Hisuian
+      ? regionName.slice(0, -1) + 'n'
+      : regionName + 'ian';
     return `${adjective} ${capitalizedBase}`;
   }
 
-  // Mega evolutions: "Mega Charizard X"
   if (category === 'mega') {
     const suffix = formName.replace('mega', '').replace(/-/g, ' ').trim().toUpperCase();
     return `Mega ${capitalizedBase}${suffix ? ' ' + suffix : ''}`;
   }
 
-  // Gigantamax: "Gigantamax Charizard"
   if (category === 'gmax') return `Gigantamax ${capitalizedBase}`;
 
-  // Other forms: "Rotom (Heat)", "Lycanroc (Midnight)"
   const formSuffix = formName
     .split('-')
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
@@ -298,7 +287,6 @@ export async function fetchVariantsByCategory(
   categories: VariantCategory[],
   genId?: number
 ): Promise<PokemonBaseInfo[]> {
-  // If a specific generation is provided, only fetch from that generation (fast)
   if (genId !== undefined) {
     const variants = await fetchVariantsForGeneration(genId);
     return variants
@@ -306,7 +294,6 @@ export async function fetchVariantsByCategory(
       .sort((a, b) => a.speciesId - b.speciesId);
   }
 
-  // Otherwise, fetch from all generations (slow - not recommended)
   const generations = await fetchGenerations();
   const allVariants: PokemonBaseInfo[] = [];
 
@@ -401,12 +388,10 @@ interface CachedPokemonResponse {
  * (which also downloads sprite assets into `public/pokemon/`).
  */
 export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> => {
-  // First check if cached in database
   const cachedResponse = await fetch(`${API_BASE}/pokemon/${id}`);
   const cachedData = await handleResponse<CachedPokemonResponse>(cachedResponse);
 
   if (cachedData) {
-    // Return cached data with local image paths
     return {
       id: cachedData.id,
       name: cachedData.name,
@@ -429,7 +414,6 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
     };
   }
 
-  // Not cached, fetch from PokeAPI
   const pokemonRes = await fetch(`${BASE_URL}/pokemon/${id}`);
   const pokemonData = (await pokemonRes.json()) as PokemonResponse;
 
@@ -446,10 +430,8 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
     pokemonData.sprites.front_default;
   const imageSvgUrl = pokemonData.sprites.other['dream_world'].front_default;
 
-  // Extract generation ID from the generation URL
   const generationId = parseInt(speciesData.generation.url.split('/').filter(Boolean).pop()!, 10);
 
-  // Fetch region name from generation endpoint
   const generationRes = await fetch(speciesData.generation.url);
   let region = 'Unknown';
   if (generationRes.ok) {
@@ -457,7 +439,6 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
     region = capitalizeRegion(generationData.main_region.name);
   }
 
-  // Determine variant info
   const speciesId = speciesData.id;
   const isDefault =
     speciesData.varieties.find(
@@ -477,8 +458,8 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
         const formData = (await formRes.json()) as FormResponse;
         isMega = formData.is_mega;
       }
-    } catch {
-      // Form endpoint might not exist
+    } catch (error) {
+      console.error('Failed to fetch form data:', error);
     }
   }
 

@@ -20,9 +20,6 @@ import {
 import { convertPcmToMp3 } from './audioConverter';
 import { getOrFetchPokemonDetailsServer } from './pokemon';
 
-// Store runner state on globalThis to survive Next.js module re-evaluation / HMR.
-// Without this, Turbopack creates separate module instances per route bundle,
-// each with its own runnerStarted flag → double tick loops → double API calls.
 const globalRunner = globalThis as unknown as {
   __jobRunnerStarted?: boolean;
   __jobRunnerActiveJobs?: Map<string, Promise<void>>;
@@ -371,7 +368,7 @@ async function tick(): Promise<void> {
   activeJobs.set(job.id, jobPromise);
 }
 
-const STALLED_JOB_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+const STALLED_JOB_THRESHOLD_MS = 5 * 60 * 1000;
 
 async function checkStalledJobs(): Promise<void> {
   try {
@@ -390,10 +387,8 @@ export function startJobRunner(): void {
   globalRunner.__jobRunnerStarted = true;
   console.log('Job runner started (single instance via globalThis)');
 
-  // Initial recovery of stalled jobs
   void checkStalledJobs();
 
-  // Periodic stalled job check
   setInterval(() => {
     void checkStalledJobs();
   }, 60000);

@@ -1,3 +1,8 @@
+/**
+ * Custom hook for managing saved Pokemon data (summaries and audio logs).
+ * Provides functions to load, refresh, and access cached saved data.
+ */
+
 import { useState, useEffect, useCallback } from 'react';
 import {
   getAllSummaries,

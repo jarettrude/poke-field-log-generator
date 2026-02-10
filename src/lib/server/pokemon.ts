@@ -56,7 +56,6 @@ type FormResponse = {
   is_default: boolean;
 };
 
-// Cache for region names fetched from PokeAPI
 let cachedRegionNames: string[] | null = null;
 
 function capitalizeRegion(name: string): string {
@@ -239,10 +238,8 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
     imageSvgUrl,
   });
 
-  // Extract generation ID from the generation URL
   const generationId = parseInt(speciesData.generation.url.split('/').filter(Boolean).pop()!, 10);
 
-  // Fetch region name from generation endpoint
   const generationRes = await fetch(speciesData.generation.url);
   let region = 'Unknown';
   if (generationRes.ok) {
@@ -250,7 +247,6 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
     region = capitalizeRegion(generationData.main_region.name);
   }
 
-  // Determine variant info
   const speciesId = speciesData.id;
   const isDefault =
     speciesData.varieties.find(
@@ -270,7 +266,6 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
         isMega = formData.is_mega;
       }
     } catch {
-      // Form endpoint might not exist
     }
   }
 

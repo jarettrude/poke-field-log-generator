@@ -1,3 +1,8 @@
+/**
+ * Custom hook for polling job processing status and managing UI state.
+ * Handles job progress tracking, cooldown states, and result compilation.
+ */
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { getJob } from '@/services/jobsService';
 import { useToast } from '@/components/ToastProvider';
@@ -57,7 +62,6 @@ export function useJobPolling({
 
   const fetchPokemonData = useCallback(
     async (pokemonId: number): Promise<{ imageUrl?: string; displayName?: string }> => {
-      // Check cache first
       if (pokemonDataCache.current.has(pokemonId)) {
         return pokemonDataCache.current.get(pokemonId)!;
       }
@@ -89,8 +93,6 @@ export function useJobPolling({
   );
 
   const extractPokemonName = (message: string): string | undefined => {
-    // Try to extract Pokemon name from message like "Generating summary for #1 Bulbasaur..."
-    // or "Synthesizing audio for #1 bulbasaur..."
     const match = message.match(/#\d+\s+(\w+)/i);
     return match?.[1];
   };
@@ -113,12 +115,10 @@ export function useJobPolling({
       const summary = summaryById.get(id);
       if (!summary) continue;
 
-      // For SUMMARY_ONLY mode, audio is not required
       const hasAudio = audioMetaIds.has(id);
       const requiresAudio = job.mode !== 'SUMMARY_ONLY';
       if (requiresAudio && !hasAudio) continue;
 
-      // Fetch audio data only if we have audio
       let audioData = '';
       if (hasAudio) {
         const audio = await getAudioLog(id);
@@ -167,10 +167,8 @@ export function useJobPolling({
         );
         setIsPaused(job.status === 'paused');
 
-        // Get current Pokemon ID from the pokemonIds array
         const currentPokemonId = job.pokemonIds[job.current] || job.pokemonIds[job.current - 1];
 
-        // Determine if we're in cooldown
         let isInCooldown = false;
         if (job.cooldownUntil) {
           const remainingMs = Math.max(0, new Date(job.cooldownUntil).getTime() - Date.now());
@@ -184,13 +182,11 @@ export function useJobPolling({
           setCooldown(null);
         }
 
-        // Fetch Pokemon data (only if not in cooldown)
         let currentPokemonImage: string | undefined;
         let currentPokemonName: string | undefined;
         if (currentPokemonId && !isInCooldown) {
           const pokemonData = await fetchPokemonData(currentPokemonId);
           currentPokemonImage = pokemonData.imageUrl;
-          // Prefer displayName from cache, fall back to message extraction
           currentPokemonName = pokemonData.displayName || extractPokemonName(job.message);
         }
 
@@ -233,7 +229,6 @@ export function useJobPolling({
           setIsProcessing(false);
           setCooldown(null);
 
-          // Build results for all modes so they can be displayed in ResultsView
           const results = await buildResultsForJob({
             generationId: job.generationId,
             pokemonIds: job.pokemonIds,

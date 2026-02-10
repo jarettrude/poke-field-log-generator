@@ -1,4 +1,9 @@
 /**
+ * Type definitions for the Pokédex Field Log Generator.
+ * Includes interfaces for Pokemon data, jobs, processing, and UI state.
+ */
+
+/**
  * Variant category for filtering UI.
  * These are derived dynamically from PokeAPI data:
  * - 'mega' detected via is_mega flag from /pokemon-form/ endpoint
@@ -13,19 +18,19 @@ export interface PokemonBaseInfo {
   id: number;
   name: string;
   url: string;
-  displayName: string; // Formatted name (e.g., "Alolan Meowth")
-  speciesId: number; // National dex number (e.g., 52)
-  isDefault: boolean; // true for base forms
-  formName: string | null; // Form identifier (e.g., "alola", "mega-x")
+  displayName: string;
+  speciesId: number;
+  isDefault: boolean;
+  formName: string | null;
   variantCategory: VariantCategory;
-  regionName?: string; // For regional forms, the region (e.g., "Alola")
+  regionName?: string;
 }
 
 /** Normalized Pokémon details used for summary generation and display. */
 export interface PokemonDetails {
   id: number;
   name: string;
-  displayName: string; // Formatted display name
+  displayName: string;
   height: number;
   weight: number;
   types: string[];
@@ -36,11 +41,11 @@ export interface PokemonDetails {
   habitat: string;
   generationId: number;
   region: string;
-  speciesId: number; // National dex ID
+  speciesId: number;
   isDefault: boolean;
   formName: string | null;
   variantCategory: VariantCategory;
-  regionName?: string; // For regional forms
+  regionName?: string;
 }
 
 /** A Pokémon generation available for selection. */
@@ -52,9 +57,9 @@ export interface Generation {
 
 /** Mode for controlling which stages of the pipeline to run. */
 export enum WorkflowMode {
-  FULL = 'FULL', // Generate summaries + audio (end-to-end)
-  SUMMARY_ONLY = 'SUMMARY_ONLY', // Generate and save summaries only
-  AUDIO_ONLY = 'AUDIO_ONLY', // Load saved summaries and generate audio
+  FULL = 'FULL',
+  SUMMARY_ONLY = 'SUMMARY_ONLY',
+  AUDIO_ONLY = 'AUDIO_ONLY',
 }
 
 /** Collection type for the generator - standard generations or variant forms */
@@ -63,19 +68,19 @@ export type CollectionType = 'generation' | 'variants';
 /** Collection filter for the generator UI */
 export interface CollectionFilter {
   type: CollectionType;
-  generationId?: number; // For generation mode
-  variantCategories?: VariantCategory[]; // For variant mode
-  includeDefaults?: boolean; // Include default forms in variant mode
+  generationId?: number;
+  variantCategories?: VariantCategory[];
+  includeDefaults?: boolean;
 }
 
 /** Top-level page/view selection within the app. */
 export enum AppView {
-  HOME = 'HOME', // Mode selection
-  GENERATION = 'GENERATION', // Generation/range selection
-  POKEDEX_LIBRARY = 'POKEDEX_LIBRARY', // Unified Pokedex library
-  ADMIN = 'ADMIN', // Edit prompts
-  PROCESSING = 'PROCESSING', // Processing overlay
-  RESULTS = 'RESULTS', // View results
+  HOME = 'HOME',
+  GENERATION = 'GENERATION',
+  POKEDEX_LIBRARY = 'POKEDEX_LIBRARY',
+  ADMIN = 'ADMIN',
+  PROCESSING = 'PROCESSING',
+  RESULTS = 'RESULTS',
 }
 
 /**
@@ -87,7 +92,7 @@ export interface ProcessedPokemon {
   name: string;
   displayName?: string;
   summary: string;
-  audioData: string; // Base64
+  audioData: string;
   pngData: string | null;
   svgData: string | null;
   variantCategory?: VariantCategory;

@@ -1,3 +1,8 @@
+/**
+ * Component exports for the application.
+ * Centralized export point for all React components.
+ */
+
 export { Header } from './Header';
 export { HomeView } from './HomeView';
 export { GenerationView } from './GenerationView';

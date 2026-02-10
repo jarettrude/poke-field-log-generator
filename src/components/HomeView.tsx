@@ -1,3 +1,8 @@
+/**
+ * Home view component displaying the main landing page.
+ * Shows navigation options for generator and library with summary counts.
+ */
+
 import React from 'react';
 import Link from 'next/link';
 import { Wand2, BookOpen, ArrowRight } from 'lucide-react';

@@ -27,22 +27,19 @@ function isDailyQuotaExhausted(error: unknown): boolean {
   if (error instanceof Error) {
     const msg = error.message;
 
-    // Check for daily quota identifiers from Google's QuotaFailure details
     const hasDailyQuotaIndicator =
-      msg.includes('PerDay') || // "GenerateRequestsPerDayPerProjectPerModel"
-      msg.includes('per_day') || // Alternative format
-      msg.includes('_per_model_per_day') || // Full metric name pattern
-      msg.includes('requests_per_day'); // Another variant
+      msg.includes('PerDay') ||
+      msg.includes('per_day') ||
+      msg.includes('_per_model_per_day') ||
+      msg.includes('requests_per_day');
 
-    // "limit: 0" with RESOURCE_EXHAUSTED means quota completely used up
     const isQuotaCompletelyExhausted =
       msg.includes('limit: 0') && msg.includes('RESOURCE_EXHAUSTED');
 
-    // If it's a per-minute limit, it's NOT daily exhaustion (should retry)
     const isPerMinuteLimit = msg.includes('PerMinute') || msg.includes('per_minute');
 
     if (isPerMinuteLimit) {
-      return false; // Per-minute limits are recoverable
+      return false;
     }
 
     return hasDailyQuotaIndicator || isQuotaCompletelyExhausted;
@@ -56,7 +53,6 @@ function isDailyQuotaExhausted(error: unknown): boolean {
  */
 function isRetryableError(error: unknown): boolean {
   if (error instanceof Error) {
-    // Daily quota exhaustion should NOT be retried - fall back immediately
     if (isDailyQuotaExhausted(error)) {
       return false;
     }
@@ -158,10 +154,8 @@ export async function generateSummary(details: PokemonDetails, region: string): 
       },
     });
 
-    // Handle potential SDK variations or empty responses
     let text = response.text;
     if (!text) {
-      // Check for candidates to provide better error details (e.g., safety blocking)
       const candidate = response.candidates?.[0];
       if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
         throw new Error(`Gemini generation stopped: ${candidate.finishReason}`);
@@ -243,7 +237,6 @@ export async function generateTts(params: { text: string; voiceName: string }): 
     console.log('Attempting TTS with gemini-2.5-pro-preview-tts...');
     return await withRetry(() => makeTtsRequest('gemini-2.5-pro-preview-tts'), MAX_RETRIES_TTS);
   } catch (proError) {
-    // Check if it was daily quota exhaustion (immediate fallback) vs retry exhaustion
     const reason = isDailyQuotaExhausted(proError)
       ? 'daily quota exhausted - immediate fallback'
       : 'exhausted all retries';

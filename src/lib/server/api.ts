@@ -1,3 +1,8 @@
+/**
+ * Standardized API response utilities for Next.js routes.
+ * Provides consistent success/error response formatting.
+ */
+
 import { NextResponse } from 'next/server';
 
 type ApiResponse<T = unknown> =

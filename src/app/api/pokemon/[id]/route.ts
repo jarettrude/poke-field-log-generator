@@ -33,7 +33,6 @@ export async function GET(_request: Request, { params }: RouteParams) {
       return successResponse(cached);
     }
 
-    // Not cached, return null to signal frontend should fetch from PokeAPI
     return successResponse(null);
   } catch (error) {
     console.error('Error fetching cached pokemon:', error);
@@ -106,10 +105,8 @@ export async function POST(request: Request, { params }: RouteParams) {
       return errorResponse('Invalid request body', 400);
     }
 
-    // Ensure directory exists
     await fs.mkdir(POKEMON_IMAGE_DIR, { recursive: true });
 
-    // Parallelize downloads
     const [imagePngPath, imageSvgPath] = await Promise.all([
       downloadImage(imagePngUrl, `${pokemonId}.png`),
       downloadImage(imageSvgUrl, `${pokemonId}.svg`),

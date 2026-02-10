@@ -1,3 +1,8 @@
+/**
+ * Home page component for the Pokédex Field Log Generator.
+ * Displays the main interface with header and home view.
+ */
+
 'use client';
 
 import { Header, HomeView, ToastProvider, ThemeProvider } from '@/components';
