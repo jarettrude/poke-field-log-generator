@@ -51,6 +51,9 @@ EXPOSE 3333
 # Environment variables for production
 ENV NODE_ENV=production
 ENV PORT=3333
+ENV HOSTNAME=0.0.0.0
 
 # Start the production server
-CMD ["node", "server.js"]
+# - exec: replaces shell so SIGTERM from Docker reaches Node for graceful shutdown
+# - 2>&1: merges stderr into stdout so Docker logs don't show every line twice
+CMD exec node server.js 2>&1

@@ -23,13 +23,18 @@ import { getOrFetchPokemonDetailsServer } from './pokemon';
 const globalRunner = globalThis as unknown as {
   __jobRunnerStarted?: boolean;
   __jobRunnerActiveJobs?: Map<string, Promise<void>>;
+  __jobRunnerActiveStages?: Map<string, ProcessingStage>;
 };
 
 if (!globalRunner.__jobRunnerActiveJobs) {
   globalRunner.__jobRunnerActiveJobs = new Map();
 }
+if (!globalRunner.__jobRunnerActiveStages) {
+  globalRunner.__jobRunnerActiveStages = new Map();
+}
 
 const activeJobs = globalRunner.__jobRunnerActiveJobs;
+const activeJobStages = globalRunner.__jobRunnerActiveStages;
 const MAX_CONCURRENT_TEXT_JOBS = 3;
 const MAX_CONCURRENT_AUDIO_JOBS = 1;
 const MAX_RETRIES = 3;
@@ -296,6 +301,7 @@ async function processJob(job: ProcessingJob): Promise<void> {
       if (!now) return;
       now.stage = 'audio';
       now.current = 0;
+      activeJobStages.set(fresh.id, 'audio');
       await db.setJobProgress(fresh.id, 'audio', 0, 0, 'Preparing audio synthesis...');
       await db.setJobCooldownUntil(fresh.id, null);
 
@@ -335,37 +341,59 @@ async function processJob(job: ProcessingJob): Promise<void> {
   }
 }
 
+let tickInProgress = false;
+
 async function tick(): Promise<void> {
-  const db = await getDatabase();
-  const runningJobs = await db.getAllRunningJobs();
+  if (tickInProgress) return;
+  tickInProgress = true;
 
-  const textJobCount = runningJobs.filter(j => j.stage === 'summary').length;
-  const audioJobCount = runningJobs.filter(j => j.stage === 'audio').length;
+  try {
+    // Use in-memory activeJobs as source of truth for concurrency (DB can be stale)
+    let activeTextJobs = 0;
+    let activeAudioJobs = 0;
+    // We can't easily inspect stage from the Map values, so track alongside
+    for (const id of activeJobs.keys()) {
+      const stage = activeJobStages.get(id);
+      if (stage === 'summary') activeTextJobs++;
+      else if (stage === 'audio') activeAudioJobs++;
+    }
 
-  const canClaimTextJob = textJobCount < MAX_CONCURRENT_TEXT_JOBS;
-  const canClaimAudioJob = audioJobCount < MAX_CONCURRENT_AUDIO_JOBS;
+    const canClaimTextJob = activeTextJobs < MAX_CONCURRENT_TEXT_JOBS;
+    const canClaimAudioJob = activeAudioJobs < MAX_CONCURRENT_AUDIO_JOBS;
 
-  if (!canClaimTextJob && !canClaimAudioJob) {
-    return;
+    if (!canClaimTextJob && !canClaimAudioJob) {
+      return;
+    }
+
+    const db = await getDatabase();
+    const claimed = await db.claimNextQueuedJob();
+    if (!claimed) return;
+
+    const job = claimed.job;
+
+    // Skip if this job is somehow already being processed in memory
+    if (activeJobs.has(job.id)) {
+      return;
+    }
+
+    const shouldProcessJob =
+      (job.stage === 'summary' && canClaimTextJob) || (job.stage === 'audio' && canClaimAudioJob);
+
+    if (!shouldProcessJob) {
+      await db.setJobStatus(job.id, 'queued');
+      return;
+    }
+
+    activeJobStages.set(job.id, job.stage);
+    const jobPromise = processJob(job).finally(() => {
+      activeJobs.delete(job.id);
+      activeJobStages.delete(job.id);
+    });
+
+    activeJobs.set(job.id, jobPromise);
+  } finally {
+    tickInProgress = false;
   }
-
-  const claimed = await db.claimNextQueuedJob();
-  if (!claimed) return;
-
-  const job = claimed.job;
-  const shouldProcessJob =
-    (job.stage === 'summary' && canClaimTextJob) || (job.stage === 'audio' && canClaimAudioJob);
-
-  if (!shouldProcessJob) {
-    await db.setJobStatus(job.id, 'queued');
-    return;
-  }
-
-  const jobPromise = processJob(job).finally(() => {
-    activeJobs.delete(job.id);
-  });
-
-  activeJobs.set(job.id, jobPromise);
 }
 
 const STALLED_JOB_THRESHOLD_MS = 5 * 60 * 1000;
