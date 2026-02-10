@@ -112,6 +112,9 @@ export interface PokemonSprites {
     dream_world: {
       front_default: string | null;
     };
+    home: {
+      front_default: string | null;
+    };
     'official-artwork': {
       front_default: string | null;
     };

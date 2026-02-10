@@ -308,7 +308,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
       if (generationFilter !== 'all' && entry.generationId !== generationFilter) return false;
       if (regionFilter !== 'all' && entry.region !== regionFilter) return false;
 
-      if (contentFilter === 'text' && !entry.summary) return false;
+      if (contentFilter === 'text' && (!entry.summary || entry.hasAudio)) return false;
       if (contentFilter === 'audio' && !entry.hasAudio) return false;
       if (contentFilter === 'complete' && (!entry.summary || !entry.hasAudio)) return false;
 
@@ -566,14 +566,31 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
 
         const cachedPokemon = response.data;
 
+        if (cachedPokemon?.imagePngPath) {
+          const pngRes = await fetch(cachedPokemon.imagePngPath);
+          if (pngRes.ok) {
+            const pngBlob = await pngRes.blob();
+            folder.file(`${filePrefix}.png`, pngBlob);
+
+            // Generate thumbnail (max 16px, alpha-preserving)
+            try {
+              const thumbRes = await fetch(`/api/pokemon/${entry.id}/thumb`);
+              if (thumbRes.ok) {
+                const thumbBlob = await thumbRes.blob();
+                folder.file(`${filePrefix}-thumb.png`, thumbBlob);
+              }
+            } catch (thumbErr) {
+              console.warn(`Failed to fetch thumbnail for ${entry.name}:`, thumbErr);
+            }
+          }
+        }
+
         if (cachedPokemon?.imageSvgPath) {
           const svgRes = await fetch(cachedPokemon.imageSvgPath);
-          const svgBlob = await svgRes.blob();
-          folder.file(`${filePrefix}.svg`, svgBlob);
-        } else if (cachedPokemon?.imagePngPath) {
-          const pngRes = await fetch(cachedPokemon.imagePngPath);
-          const pngBlob = await pngRes.blob();
-          folder.file(`${filePrefix}.png`, pngBlob);
+          if (svgRes.ok) {
+            const svgBlob = await svgRes.blob();
+            folder.file(`${filePrefix}.svg`, svgBlob);
+          }
         }
       } catch (e) {
         console.warn(`Failed to fetch images for ${entry.name}:`, e);

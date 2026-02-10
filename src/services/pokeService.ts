@@ -440,7 +440,10 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
     .filter((entry: { language: { name: string } }) => entry.language.name === 'en')
     .map((entry: { flavor_text: string }) => entry.flavor_text.replace(/[\n\f]/g, ' '));
 
-  const imagePngUrl = pokemonData.sprites.other['official-artwork'].front_default;
+  const imagePngUrl =
+    pokemonData.sprites.other['official-artwork'].front_default ??
+    pokemonData.sprites.other.home.front_default ??
+    pokemonData.sprites.front_default;
   const imageSvgUrl = pokemonData.sprites.other['dream_world'].front_default;
 
   // Extract generation ID from the generation URL

@@ -227,7 +227,10 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
     .filter(entry => entry.language.name === 'en')
     .map(entry => entry.flavor_text.replace(/[\n\f]/g, ' '));
 
-  const imagePngUrl = pokemonData.sprites.other['official-artwork'].front_default;
+  const imagePngUrl =
+    pokemonData.sprites.other['official-artwork'].front_default ??
+    pokemonData.sprites.other.home.front_default ??
+    pokemonData.sprites.front_default;
   const imageSvgUrl = pokemonData.sprites.other.dream_world.front_default;
 
   const { imagePngPath, imageSvgPath } = await downloadSpriteAssets({
