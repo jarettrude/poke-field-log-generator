@@ -181,12 +181,14 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [generationFilter, setGenerationFilter] = useState<number | 'all'>('all');
   const [regionFilter, setRegionFilter] = useState<string | 'all'>('all');
-  const [contentFilter, setContentFilter] = useState<'all' | 'text' | 'audio' | 'complete'>('all');
+  const [contentFilter, setContentFilter] = useState<
+    'all' | 'text' | 'audio' | 'complete' | 'text-only' | 'audio-only'
+  >('all');
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [selectionMode, setSelectionMode] = useState<'manual' | 'range' | 'generation' | 'region'>(
-    'manual'
-  );
+  const [selectionMode, setSelectionMode] = useState<
+    'manual' | 'range' | 'generation' | 'region' | 'has-text' | 'has-audio'
+  >('manual');
   const [rangeStart, setRangeStart] = useState<number>(1);
   const [rangeEnd, setRangeEnd] = useState<number>(151);
   const [pokemonCache, setPokemonCache] = useState<Map<number, CachedPokemonData>>(new Map());
@@ -308,8 +310,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
       if (generationFilter !== 'all' && entry.generationId !== generationFilter) return false;
       if (regionFilter !== 'all' && entry.region !== regionFilter) return false;
 
-      if (contentFilter === 'text' && (!entry.summary || entry.hasAudio)) return false;
+      if (contentFilter === 'text' && !entry.summary) return false;
       if (contentFilter === 'audio' && !entry.hasAudio) return false;
+      if (contentFilter === 'text-only' && (!entry.summary || entry.hasAudio)) return false;
+      if (contentFilter === 'audio-only' && (!entry.hasAudio || !!entry.summary)) return false;
       if (contentFilter === 'complete' && (!entry.summary || !entry.hasAudio)) return false;
 
       if (searchQuery) {
@@ -442,9 +446,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
       }
 
       if (mode === 'generation') {
-        if (generationFilter === 'all') return newSelection;
+        // Select all filtered entries matching the generation filter
+        // When filter is 'all', select everything currently visible
         for (const entry of filteredEntries) {
-          if (entry.generationId === generationFilter) {
+          if (generationFilter === 'all' || entry.generationId === generationFilter) {
             newSelection.add(entry.id);
           }
         }
@@ -452,9 +457,28 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
       }
 
       if (mode === 'region') {
-        if (regionFilter === 'all') return newSelection;
+        // Select all filtered entries matching the region filter
+        // When filter is 'all', select everything currently visible
         for (const entry of filteredEntries) {
-          if (entry.region === regionFilter) {
+          if (regionFilter === 'all' || entry.region === regionFilter) {
+            newSelection.add(entry.id);
+          }
+        }
+        return newSelection;
+      }
+
+      if (mode === 'has-text') {
+        for (const entry of filteredEntries) {
+          if (entry.summary) {
+            newSelection.add(entry.id);
+          }
+        }
+        return newSelection;
+      }
+
+      if (mode === 'has-audio') {
+        for (const entry of filteredEntries) {
+          if (entry.hasAudio) {
             newSelection.add(entry.id);
           }
         }
@@ -514,12 +538,14 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
     setSelectedIds(computeSelectionForMode(selectionMode));
   }, [
     computeSelectionForMode,
+    contentFilter,
     filteredEntries.length,
     filteredIdBounds,
     generationFilter,
     rangeEnd,
     rangeStart,
     regionFilter,
+    searchQuery,
     selectionMode,
   ]);
 
@@ -667,7 +693,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
             Pokédex Library
           </h1>
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-            {entries.length} entries • {selectedIds.size} selected
+            {filteredEntries.length === entries.length
+              ? `${entries.length} entries`
+              : `${filteredEntries.length} of ${entries.length} entries`}{' '}
+            • {selectedIds.size} selected
           </p>
         </div>
 
@@ -819,13 +848,22 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           className="flex gap-1 rounded-lg p-0.5"
           style={{ border: '2px solid var(--border-primary)', background: 'var(--bg-tertiary)' }}
         >
-          {(['all', 'text', 'audio', 'complete'] as const).map(filter => (
+          {(
+            [
+              { key: 'all', label: 'All' },
+              { key: 'text', label: 'Has Text' },
+              { key: 'audio', label: 'Has Audio' },
+              { key: 'text-only', label: 'Text Only' },
+              { key: 'audio-only', label: 'Audio Only' },
+              { key: 'complete', label: 'Complete' },
+            ] as const
+          ).map(({ key, label }) => (
             <button
-              key={filter}
-              onClick={() => setContentFilter(filter)}
+              key={key}
+              onClick={() => setContentFilter(key)}
               className="rounded-md px-2 py-1 text-xs font-semibold transition-all"
               style={
-                contentFilter === filter
+                contentFilter === key
                   ? {
                       background: 'var(--accent-primary)',
                       color: 'var(--text-inverse)',
@@ -835,13 +873,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                     }
               }
             >
-              {filter === 'all'
-                ? 'All'
-                : filter === 'complete'
-                  ? 'Complete'
-                  : filter === 'text'
-                    ? 'Text'
-                    : 'Audio'}
+              {label}
             </button>
           ))}
         </div>
@@ -853,7 +885,14 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
           Select:
         </span>
-        {(['manual', 'range', 'generation', 'region'] as const).map(mode => (
+        {[
+          { mode: 'manual' as const, label: 'Manual' },
+          { mode: 'range' as const, label: 'Range' },
+          { mode: 'generation' as const, label: 'Gen' },
+          { mode: 'region' as const, label: 'Region' },
+          { mode: 'has-text' as const, label: 'Has Text' },
+          { mode: 'has-audio' as const, label: 'Has Audio' },
+        ].map(({ mode, label }) => (
           <button
             key={mode}
             onClick={() => handleSelectionModeChange(mode)}
@@ -870,24 +909,20 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                   }
             }
           >
-            {mode === 'manual'
-              ? 'Manual'
-              : mode === 'range'
-                ? 'Range'
-                : mode === 'generation'
-                  ? 'Gen'
-                  : 'Region'}
+            {label}
           </button>
         ))}
 
         {/* Range Inputs */}
-        {selectionMode === 'range' && (
+        {selectionMode === 'range' && filteredIdBounds && (
           <>
             <input
               type="number"
               value={rangeStart}
+              min={filteredIdBounds.min}
+              max={filteredIdBounds.max}
               onChange={e => setRangeStart(Number(e.target.value))}
-              className="input w-16 px-2 py-1 text-xs"
+              className="input w-20 px-2 py-1 text-xs"
             />
             <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               -
@@ -895,11 +930,22 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
             <input
               type="number"
               value={rangeEnd}
+              min={filteredIdBounds.min}
+              max={filteredIdBounds.max}
               onChange={e => setRangeEnd(Number(e.target.value))}
-              className="input w-16 px-2 py-1 text-xs"
+              className="input w-20 px-2 py-1 text-xs"
             />
+            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              ({filteredIdBounds.min}–{filteredIdBounds.max})
+            </span>
             <button
-              onClick={() => handleSelectionModeChange('range')}
+              onClick={() => {
+                const low = Math.max(filteredIdBounds.min, Math.min(rangeStart, rangeEnd));
+                const high = Math.min(filteredIdBounds.max, Math.max(rangeStart, rangeEnd));
+                setRangeStart(low);
+                setRangeEnd(high);
+                setSelectedIds(computeSelectionForMode('range', { start: low, end: high }));
+              }}
               className="btn btn-secondary px-2 py-1 text-xs"
             >
               Apply
