@@ -265,8 +265,7 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
         const formData = (await formRes.json()) as FormResponse;
         isMega = formData.is_mega;
       }
-    } catch {
-    }
+    } catch {}
   }
 
   const { category: variantCategory, regionName } = await categorizeVariant(formName, isMega);

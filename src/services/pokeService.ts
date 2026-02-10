@@ -142,9 +142,7 @@ export function formatDisplayName(
   if (!formName || category === 'default') return capitalizedBase;
 
   if (category === 'regional' && regionName) {
-    const adjective = regionName.endsWith('a')
-      ? regionName.slice(0, -1) + 'n'
-      : regionName + 'ian';
+    const adjective = regionName.endsWith('a') ? regionName.slice(0, -1) + 'n' : regionName + 'ian';
     return `${adjective} ${capitalizedBase}`;
   }
 
