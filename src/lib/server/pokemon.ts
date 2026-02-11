@@ -56,7 +56,7 @@ type FormResponse = {
   is_default: boolean;
 };
 
-let cachedRegionNames: string[] | null = null;
+let regionNamesPromise: Promise<string[]> | null = null;
 
 function capitalizeRegion(name: string): string {
   return name.charAt(0).toUpperCase() + name.slice(1);
@@ -64,19 +64,23 @@ function capitalizeRegion(name: string): string {
 
 /**
  * Fetch all region names from PokeAPI dynamically.
+ * Uses a promise-based cache to deduplicate concurrent fetches.
  */
-async function getRegionNames(): Promise<string[]> {
-  if (cachedRegionNames) return cachedRegionNames;
-
-  const res = await fetch(`${BASE_URL}/region`);
-  if (!res.ok) {
-    console.warn('Failed to fetch regions, using empty list');
-    return [];
+function getRegionNames(): Promise<string[]> {
+  if (!regionNamesPromise) {
+    regionNamesPromise = (async () => {
+      const res = await fetch(`${BASE_URL}/region`);
+      if (!res.ok) {
+        // Reset so next call retries
+        regionNamesPromise = null;
+        console.warn('Failed to fetch regions, using empty list');
+        return [];
+      }
+      const data = (await res.json()) as { results: Array<{ name: string }> };
+      return data.results.map(r => r.name);
+    })();
   }
-
-  const data = (await res.json()) as { results: Array<{ name: string }> };
-  cachedRegionNames = data.results.map(r => r.name);
-  return cachedRegionNames;
+  return regionNamesPromise;
 }
 
 /**
@@ -136,6 +140,16 @@ function formatDisplayName(
 }
 
 /**
+ * Atomically write data to a file by writing to a temp file first, then renaming.
+ * Prevents partial reads if another request reads the file mid-write.
+ */
+async function atomicWriteFile(targetPath: string, data: Buffer | string): Promise<void> {
+  const tmpPath = `${targetPath}.tmp.${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  await fs.writeFile(tmpPath, data);
+  await fs.rename(tmpPath, targetPath);
+}
+
+/**
  * Download PNG and SVG sprites to public/pokemon/ and return local paths.
  */
 async function downloadSpriteAssets(params: {
@@ -156,7 +170,7 @@ async function downloadSpriteAssets(params: {
       if (response.ok) {
         const buffer = await response.arrayBuffer();
         const filename = `${pokemonId}.png`;
-        await fs.writeFile(path.join(POKEMON_IMAGE_DIR, filename), Buffer.from(buffer));
+        await atomicWriteFile(path.join(POKEMON_IMAGE_DIR, filename), Buffer.from(buffer));
         imagePngPath = `/pokemon/${filename}`;
       }
     } catch (e) {
@@ -170,7 +184,7 @@ async function downloadSpriteAssets(params: {
       if (response.ok) {
         const svgContent = await response.text();
         const filename = `${pokemonId}.svg`;
-        await fs.writeFile(path.join(POKEMON_IMAGE_DIR, filename), svgContent);
+        await atomicWriteFile(path.join(POKEMON_IMAGE_DIR, filename), svgContent);
         imageSvgPath = `/pokemon/${filename}`;
       }
     } catch (e) {
@@ -226,11 +240,12 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
     .filter(entry => entry.language.name === 'en')
     .map(entry => entry.flavor_text.replace(/[\n\f]/g, ' '));
 
-  const imagePngUrl =
-    pokemonData.sprites.other['official-artwork'].front_default ??
-    pokemonData.sprites.other.home.front_default ??
-    pokemonData.sprites.front_default;
   const imageSvgUrl = pokemonData.sprites.other.dream_world.front_default;
+  const imagePngUrl = imageSvgUrl
+    ? null
+    : (pokemonData.sprites.other['official-artwork'].front_default ??
+      pokemonData.sprites.other.home.front_default ??
+      pokemonData.sprites.front_default);
 
   const { imagePngPath, imageSvgPath } = await downloadSpriteAssets({
     pokemonId: id,

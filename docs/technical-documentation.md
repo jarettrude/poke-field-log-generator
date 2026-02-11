@@ -27,35 +27,56 @@ src/
 ├── app/
 │   ├── api/
 │   │   ├── audio/           # Audio log CRUD operations
-│   │   ├── jobs/            # Job management endpoints
-│   │   ├── pokemon/         # Pokemon data caching
+│   │   ├── jobs/            # Job management + maintenance endpoints
+│   │   ├── pokemon/         # Pokemon data caching + thumbnails
 │   │   ├── prompts/         # Prompt customization
 │   │   └── summaries/       # Summary CRUD operations
+│   ├── admin/               # Admin page
+│   ├── generator/           # Generator page
+│   ├── library/             # Library page
 │   ├── page.tsx             # Main application interface
 │   └── layout.tsx           # Root layout
 ├── components/
+│   ├── AdminView.tsx        # Admin panel component
+│   ├── GenerationView.tsx   # Pokemon selection + generation UI
 │   ├── Header.tsx           # Application header
-│   ├── views/               # Main view components
-│   └── overlays/            # Modal and overlay components
+│   ├── HomeView.tsx         # Landing page component
+│   ├── LibraryView.tsx      # Summary/audio library browser
+│   ├── PokedexLibraryView.tsx # Pokedex-style library view
+│   ├── ProcessingOverlay.tsx # Job progress overlay
+│   ├── ResultsView.tsx      # Generation results display
+│   ├── ThemeProvider.tsx    # Theme context provider
+│   └── ToastProvider.tsx    # Toast notification system
+├── hooks/
+│   ├── useJobPolling.ts     # Job status polling + progress tracking
+│   ├── usePokemonData.ts    # Pokemon data fetching + caching
+│   └── useSavedData.ts      # Saved summaries/audio state
 ├── services/
-│   ├── audioService.ts      # Audio log API client
-│   ├── jobService.ts        # Job management API client
-│   ├── pokemonService.ts    # Pokemon data API client
-│   ├── promptService.ts     # Prompt API client
-│   └── summaryService.ts    # Summary API client
+│   ├── jobsService.ts       # Job management API client
+│   ├── pokeService.ts       # Pokemon data API client + variant detection
+│   ├── promptService.ts     # Prompt API client + defaults
+│   ├── storageService.ts    # Summary + audio log API client
+│   ├── audioSplitter.ts     # Client-side audio splitting
+│   ├── audioSplitterNode.ts # Node-compatible audio splitting
+│   └── audioUtils.ts        # Audio playback utilities
 ├── lib/
 │   ├── db/
+│   │   ├── adapter.ts       # Database adapter interface + types
 │   │   ├── sqlite.ts        # SQLite database adapter
-│   │   └── mysql.ts         # MySQL database adapter (optional)
+│   │   └── mysql.ts         # MySQL database adapter (placeholder)
 │   └── server/
 │       ├── jobRunner.ts     # Background job processor
-│       ├── geminiClient.ts  # Gemini AI client wrapper
-│       └── prompts.ts       # Default prompt templates
+│       ├── gemini.ts        # Gemini AI client (text + TTS)
+│       ├── pokemon.ts       # Server-side Pokemon data fetching
+│       ├── audioConverter.ts # PCM to MP3 conversion via ffmpeg
+│       ├── config.ts        # Server-side configuration constants
+│       ├── api.ts           # Standardized API response utilities
+│       └── prompts.ts       # Server-side prompt retrieval
 ├── utils/
-│   ├── pokemon.ts           # Pokemon data utilities
-│   └── audio.ts             # Audio processing utilities
+│   └── pokemonUtils.ts      # Pokemon display formatting utilities
 ├── types.ts                 # TypeScript type definitions
-└── constants.ts             # Application constants
+├── constants.ts             # Application constants (voices, flavor text)
+└── instrumentation.ts       # Next.js instrumentation (starts job runner)
 ```
 
 ## Database Schema
@@ -78,6 +99,14 @@ CREATE TABLE pokemon_cache (
   move_names TEXT NOT NULL,      -- JSON array
   image_png_path TEXT,
   image_svg_path TEXT,
+  generation_id INTEGER NOT NULL,
+  region TEXT NOT NULL,
+  display_name TEXT,             -- Formatted display name
+  species_id INTEGER,            -- Base species ID
+  is_default INTEGER,            -- 1 if default form
+  form_name TEXT,                -- Variant form name
+  variant_category TEXT,         -- 'default' | 'mega' | 'regional' | 'gmax' | 'other'
+  region_name TEXT,              -- Region name for regional variants
   cached_at TEXT NOT NULL
 );
 ```
@@ -110,8 +139,8 @@ CREATE TABLE audio_logs (
   generation_id INTEGER NOT NULL,
   voice TEXT NOT NULL,           -- Voice profile (Kore, Zephyr, etc.)
   audio_base64 TEXT NOT NULL,    -- Base64-encoded audio data
-  audio_format TEXT NOT NULL,    -- "pcm_s16le" or "wav"
-  sample_rate INTEGER NOT NULL,  -- 24000 Hz
+  audio_format TEXT NOT NULL,    -- "mp3"
+  bitrate INTEGER NOT NULL,      -- MP3 bitrate in kbps (default: 128)
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -146,9 +175,10 @@ CREATE TABLE jobs (
   total INTEGER NOT NULL,
   current INTEGER NOT NULL,
   message TEXT NOT NULL,
-  cooldown_until TEXT,           -- ISO timestamp
+  cooldown_until TEXT,           -- ISO timestamp for rate-limit cooldown
   error TEXT,
-  pokemon_ids TEXT NOT NULL,     -- JSON array
+  retry_count INTEGER DEFAULT 0, -- Number of retry attempts
+  pokemon_ids TEXT NOT NULL,     -- JSON array of Pokemon IDs to process
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -168,17 +198,20 @@ The job-based architecture handles long-running AI operations without blocking t
 
 ### Job Runner
 
-The background job runner (`lib/server/jobRunner.ts`) polls for queued jobs every second and processes them sequentially.
+The background job runner (`lib/server/jobRunner.ts`) polls for queued jobs every second and processes them with stage-aware concurrency control.
 
 **Key Features:**
-- Automatic cooldown management between API calls
-- Pause/resume/cancel support
-- Error handling and retry logic
+- Stage-aware job claiming (only claims jobs matching available capacity)
+- Concurrency limits: 3 concurrent summary jobs, 1 concurrent audio job
+- Automatic cooldown management with jitter between API calls
+- Heartbeat mechanism to prevent stalled job false positives
+- Pause/resume/cancel support with atomic state transitions
+- Error handling and retry logic with exponential backoff
 - Progress tracking
 
 **Cooldown Periods:**
-- Summary generation: 15 seconds between Pokemon
-- TTS generation: 5 minutes between batches (up to 15 summaries per batch)
+- Summary generation: 15 seconds between Pokemon (±20% jitter)
+- TTS generation: 15 seconds between Pokemon (±20% jitter)
 
 ### Job Control
 
@@ -194,12 +227,12 @@ The application uses Google's Gemini AI for both text generation and text-to-spe
 
 ### Text Generation
 
-**Model:** gemini-2.0-flash
+**Model:** gemini-3-flash-preview
 
 **Configuration:**
-- Temperature: 0.7
-- Max output tokens: 2048
-- Safety settings: Block only high-probability harmful content
+- Temperature: 0.85
+- Structured JSON output via response schema
+- Retry with exponential backoff (up to 4 retries)
 
 **Prompt Structure:**
 ```
@@ -219,12 +252,14 @@ Available Moves: {moves}
 
 ### Text-to-Speech
 
-**Model:** gemini-2.5-flash-preview-tts
+**Primary Model:** gemini-2.5-pro-preview-tts (50 RPD)
+**Fallback Model:** gemini-2.5-flash-preview-tts (100 RPD)
 
 **Configuration:**
-- Sample rate: 24000 Hz
-- Format: PCM 16-bit signed little-endian
+- Output: PCM 16-bit signed little-endian at 24000 Hz, converted to MP3 (128 kbps) via ffmpeg
 - Voice profiles: Kore, Zephyr, Charon, Puck, Fenrir
+- Strategy: Pro-first with Flash fallback. Max 4 API calls per Pokemon (1+1 retry on Pro, 1+1 retry on Flash)
+- Daily quota exhaustion triggers immediate fallback (no retries)
 
 **Director's Notes:**
 The TTS prompt includes detailed director's notes for voice styling:
@@ -258,12 +293,13 @@ The TTS prompt includes detailed director's notes for voice styling:
 ### Audio Generation
 
 1. Client creates job with mode `FULL` or `AUDIO_ONLY`
-2. Job runner fetches existing summaries
-3. Batches up to 15 summaries with `[PAUSE]` markers
-4. Constructs TTS prompt with director's notes
-5. Calls Gemini TTS API
-6. Saves audio to database as base64
-7. Updates job progress
+2. Job runner fetches existing summary for each Pokemon
+3. Constructs TTS prompt with director's notes
+4. Calls Gemini TTS API (one call per Pokemon, Pro-first with Flash fallback)
+5. Converts PCM response to MP3 via ffmpeg
+6. Saves audio to database as base64-encoded MP3
+7. Enforces 15-second cooldown between Pokemon
+8. Updates job progress
 
 ## Environment Configuration
 
@@ -329,8 +365,9 @@ The project uses:
 
 ### Rate Limiting
 
-- Summary generation: 15-second cooldown between requests
-- TTS generation: 5-minute cooldown between batches
+- Summary generation: 15-second cooldown between Pokemon (±20% jitter)
+- TTS generation: 15-second cooldown between Pokemon (±20% jitter)
+- Concurrency: Up to 3 summary jobs, 1 audio job running simultaneously
 - Cooldowns enforced server-side in job runner
 
 ### Database Optimization
@@ -385,9 +422,9 @@ The SQLite database file (`pokemon_data.db`) is created automatically on first r
 - Verify sprite URLs are accessible
 
 **Audio playback issues:**
-- Confirm browser supports WAV format
+- Confirm browser supports MP3 format
 - Check audio data is properly base64 encoded
-- Verify sample rate is 24000 Hz
+- Verify ffmpeg-static is installed correctly
 
 ## Future Enhancements
 

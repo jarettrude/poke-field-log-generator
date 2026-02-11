@@ -130,9 +130,9 @@ https://github.com/jarettrude/poke-field-log-generator/raw/main/docs/example/000
 
 ## Documentation
 
-- [Technical Documentation](./docs/technical-documentation.md) - Architecture and implementation details
-- [API Reference](./docs/api-reference.md) - Complete API endpoint documentation
-- [Data Processing](./docs/pokeapi-data-and-prompts.md) - Data structures and prompt engineering
+- [Technical Documentation](./technical-documentation.md) - Architecture and implementation details
+- [API Reference](./api-reference.md) - Complete API endpoint documentation
+- [Data Processing](./pokeapi-data-and-prompts.md) - Data structures and prompt engineering
 
 ## Project Information
 

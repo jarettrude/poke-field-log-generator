@@ -466,14 +466,27 @@ export class SQLiteAdapter implements DatabaseAdapter {
     return this.mapRowToJob(row);
   }
 
-  async claimNextQueuedJob(): Promise<{ job: ProcessingJob; pokemonIds: number[] } | null> {
+  async claimNextQueuedJob(
+    allowedStages?: ProcessingStage[]
+  ): Promise<{ job: ProcessingJob; pokemonIds: number[] } | null> {
     const now = new Date().toISOString();
 
     const claim = this.db!.transaction(() => {
-      const stmt = this.db!.prepare(
-        'SELECT * FROM jobs WHERE status = ? ORDER BY created_at ASC LIMIT 1'
-      );
-      const row = stmt.get('queued') as DatabaseRow | undefined;
+      let row: DatabaseRow | undefined;
+
+      if (allowedStages && allowedStages.length > 0) {
+        const placeholders = allowedStages.map(() => '?').join(', ');
+        const stmt = this.db!.prepare(
+          `SELECT * FROM jobs WHERE status = ? AND stage IN (${placeholders}) ORDER BY created_at ASC LIMIT 1`
+        );
+        row = stmt.get('queued', ...allowedStages) as DatabaseRow | undefined;
+      } else {
+        const stmt = this.db!.prepare(
+          'SELECT * FROM jobs WHERE status = ? ORDER BY created_at ASC LIMIT 1'
+        );
+        row = stmt.get('queued') as DatabaseRow | undefined;
+      }
+
       if (!row) return null;
 
       const update = this.db!.prepare(
@@ -521,6 +534,12 @@ export class SQLiteAdapter implements DatabaseAdapter {
     stmt.run(cooldownUntil, now, id);
   }
 
+  async setJobHeartbeat(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    const stmt = this.db!.prepare('UPDATE jobs SET updated_at = ? WHERE id = ?');
+    stmt.run(now, id);
+  }
+
   async setJobError(id: string, error: string): Promise<void> {
     const now = new Date().toISOString();
     const stmt = this.db!.prepare(
@@ -533,8 +552,38 @@ export class SQLiteAdapter implements DatabaseAdapter {
     await this.setJobStatus(id, 'canceled');
   }
 
+  async cancelJobAtomic(
+    id: string,
+    stage: ProcessingStage,
+    current: number,
+    total: number
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const txn = this.db!.transaction(() => {
+      this.db!.prepare(
+        'UPDATE jobs SET status = ?, stage = ?, current = ?, total = ?, message = ?, cooldown_until = NULL, updated_at = ? WHERE id = ?'
+      ).run('canceled', stage, current, total, 'Canceled', now, id);
+    });
+    txn();
+  }
+
   async pauseJob(id: string): Promise<void> {
     await this.setJobStatus(id, 'paused');
+  }
+
+  async pauseJobAtomic(
+    id: string,
+    stage: ProcessingStage,
+    current: number,
+    total: number
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const txn = this.db!.transaction(() => {
+      this.db!.prepare(
+        'UPDATE jobs SET status = ?, stage = ?, current = ?, total = ?, message = ?, cooldown_until = NULL, updated_at = ? WHERE id = ?'
+      ).run('paused', stage, current, total, 'Paused', now, id);
+    });
+    txn();
   }
 
   async resumeJob(id: string): Promise<void> {

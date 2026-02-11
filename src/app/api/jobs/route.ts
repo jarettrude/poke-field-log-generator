@@ -1,14 +1,11 @@
 import { randomUUID } from 'crypto';
 import { getDatabase } from '@/lib/db/adapter';
-import { startJobRunner } from '@/lib/server/jobRunner';
 import { successResponse, errorResponse } from '@/lib/server/api';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
-    startJobRunner();
-
     const body = await request.json();
     const { mode, generationId, region, voice, pokemonIds } = body as {
       mode: 'FULL' | 'SUMMARY_ONLY' | 'AUDIO_ONLY';

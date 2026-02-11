@@ -9,9 +9,7 @@ export async function POST() {
     const running = await db.getAllRunningJobs();
 
     for (const job of running) {
-      await db.cancelJob(job.id);
-      await db.setJobCooldownUntil(job.id, null);
-      await db.setJobProgress(job.id, job.stage, job.current, job.total, 'Canceled');
+      await db.cancelJobAtomic(job.id, job.stage, job.current, job.total);
     }
 
     return successResponse({ canceledCount: running.length });

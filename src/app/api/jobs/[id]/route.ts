@@ -1,5 +1,4 @@
 import { getDatabase } from '@/lib/db/adapter';
-import { startJobRunner } from '@/lib/server/jobRunner';
 import { successResponse, errorResponse } from '@/lib/server/api';
 
 export const runtime = 'nodejs';
@@ -10,8 +9,6 @@ interface RouteParams {
 
 export async function GET(_request: Request, { params }: RouteParams) {
   try {
-    startJobRunner();
-
     const { id } = await params;
     const db = await getDatabase();
     const job = await db.getJob(id);

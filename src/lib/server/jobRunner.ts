@@ -55,6 +55,8 @@ async function sleepWithJobControl(
     if (!job) return 'canceled';
     if (job.status === 'canceled' || job.status === 'failed') return 'canceled';
     if (job.status === 'paused') return 'paused';
+    // Heartbeat: touch updated_at so recoverStalledJobs doesn't resurrect active jobs
+    await db.setJobHeartbeat(jobId);
     await sleep(1000);
   }
   return 'ok';
@@ -289,32 +291,30 @@ async function processJob(job: ProcessingJob): Promise<void> {
         return;
       }
 
-      await setProgress({
-        jobId: fresh.id,
-        stage: 'audio',
-        current: 0,
-        total: 0,
-        message: 'Preparing audio synthesis...',
-      });
-
-      const now = await db.getJob(fresh.id);
-      if (!now) return;
-      now.stage = 'audio';
-      now.current = 0;
-      activeJobStages.set(fresh.id, 'audio');
-      await db.setJobProgress(fresh.id, 'audio', 0, 0, 'Preparing audio synthesis...');
+      // Atomically transition stage in DB first, then update in-memory state
+      await db.setJobProgress(
+        fresh.id,
+        'audio',
+        0,
+        fresh.pokemonIds.length,
+        'Preparing audio synthesis...'
+      );
       await db.setJobCooldownUntil(fresh.id, null);
+      activeJobStages.set(fresh.id, 'audio');
 
-      const audioResult = await processAudioStage(now);
+      const audioJob = await db.getJob(fresh.id);
+      if (!audioJob) return;
+
+      const audioResult = await processAudioStage(audioJob);
       if (audioResult !== 'ok') return;
 
-      await db.setJobCooldownUntil(now.id, null);
-      await db.setJobStatus(now.id, 'completed');
+      await db.setJobCooldownUntil(audioJob.id, null);
+      await db.setJobStatus(audioJob.id, 'completed');
       await setProgress({
-        jobId: now.id,
+        jobId: audioJob.id,
         stage: 'audio',
-        current: now.total,
-        total: now.total,
+        current: audioJob.total,
+        total: audioJob.total,
         message: 'Completed audio synthesis.',
       });
       return;
@@ -351,7 +351,6 @@ async function tick(): Promise<void> {
     // Use in-memory activeJobs as source of truth for concurrency (DB can be stale)
     let activeTextJobs = 0;
     let activeAudioJobs = 0;
-    // We can't easily inspect stage from the Map values, so track alongside
     for (const id of activeJobs.keys()) {
       const stage = activeJobStages.get(id);
       if (stage === 'summary') activeTextJobs++;
@@ -365,22 +364,18 @@ async function tick(): Promise<void> {
       return;
     }
 
+    const allowedStages: ProcessingStage[] = [];
+    if (canClaimTextJob) allowedStages.push('summary');
+    if (canClaimAudioJob) allowedStages.push('audio');
+
     const db = await getDatabase();
-    const claimed = await db.claimNextQueuedJob();
+    const claimed = await db.claimNextQueuedJob(allowedStages);
     if (!claimed) return;
 
     const job = claimed.job;
 
     // Skip if this job is somehow already being processed in memory
     if (activeJobs.has(job.id)) {
-      return;
-    }
-
-    const shouldProcessJob =
-      (job.stage === 'summary' && canClaimTextJob) || (job.stage === 'audio' && canClaimAudioJob);
-
-    if (!shouldProcessJob) {
-      await db.setJobStatus(job.id, 'queued');
       return;
     }
 

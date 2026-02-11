@@ -47,7 +47,10 @@ async function downloadImage(url: string | null, filename: string): Promise<stri
     if (!response.ok) return null;
 
     const buffer = await response.arrayBuffer();
-    await fs.writeFile(path.join(POKEMON_IMAGE_DIR, filename), Buffer.from(buffer));
+    const targetPath = path.join(POKEMON_IMAGE_DIR, filename);
+    const tmpPath = `${targetPath}.tmp.${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await fs.writeFile(tmpPath, Buffer.from(buffer));
+    await fs.rename(tmpPath, targetPath);
     return `/pokemon/${filename}`;
   } catch (e) {
     console.warn(`Failed to download image from ${url}:`, e);

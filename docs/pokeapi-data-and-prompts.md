@@ -63,16 +63,22 @@ After fetching and processing, the application works with this simplified struct
 ```typescript
 interface PokemonDetails {
   id: number;                    // National Pokédex number (1-1025+)
-  name: string;                  // Formatted name (e.g., "Charizard")
+  name: string;                  // Lowercase name (e.g., "charizard")
+  displayName: string;           // Formatted name (e.g., "Charizard")
   height: number;                // Height in decimeters
   weight: number;                // Weight in hectograms
   types: string[];               // Array of type names
-  imagePng: string | null;       // Local PNG path or remote URL
-  imageSvg: string | null;       // Local SVG path or remote URL
+  imagePngPath: string | null;   // Local PNG path (e.g., "/pokemon/6.png")
+  imageSvgPath: string | null;   // Local SVG path (e.g., "/pokemon/6.svg")
   flavorTexts: string[];         // English flavor text entries
-  allMoveNames: string[];        // Move names with spaces (e.g., "Flamethrower")
+  moveNames: string[];           // Move names in kebab-case (e.g., "flame-wheel")
   habitat: string;               // Habitat or "the unknown wild"
-  region?: string;               // Region name (Kanto, Johto, etc.)
+  region: string;                // Region name (Kanto, Johto, etc.)
+  speciesId: number;             // Base species ID
+  isDefault: boolean;            // Whether this is the default form
+  formName: string | null;       // Variant form name
+  variantCategory: VariantCategory; // 'default' | 'mega' | 'regional' | 'gmax' | 'other'
+  regionName: string | null;     // Region name for regional variants
 }
 ```
 
@@ -164,7 +170,7 @@ Technical: High-clarity audio. Ensure a clean "cold finish" immediately after th
 `;
 ```
 
-For bulk TTS (multiple summaries), entries are joined with `[PAUSE]` markers and the model is instructed to pause for 3 seconds at each marker.
+Audio is generated one Pokemon at a time (one TTS call per Pokemon) with a 15-second cooldown between calls. The TTS pipeline uses a Pro-first strategy with Flash fallback.
 
 ## Data Flow Example
 
@@ -197,7 +203,7 @@ Available Moves: flamethrower, fire blast, dragon rage, wing attack
 
 ### Output Summary
 ```
-"Pokémon trainer log 6. Today, I encountered a Charizard near a mountain within the Kanto region. The magnificent creature soared overhead, its massive 1.7m wingspan casting shadows across the rocky terrain. I watched in awe as it unleashed a devastating **Flamethrower**, the intense heat causing the very air to shimmer around us. Its fiery breath reached incredible temperatures, a testament to the power described in the research logs. The dragon-type Pokémon then demonstrated its agility with a swift **Wing Attack**, slicing through the mountain air with precision..."
+"Pokémon trainer log 6. Sulfurous heat shimmered off the volcanic ridgeline as a shadow eclipsed the sun—wings spanning nearly two meters, trailing embers like a comet's tail. The Charizard (CHAR-ih-zard) banked low over the caldera rim, its orange scales catching the magma-glow from below. I pressed flat against the obsidian outcrop as it unleashed a devastating **Flamethrower** across the mountainside, the blast wave carrying the scent of scorched basalt. Its fiery breath reached incredible temperatures, a testament to the power described in the research logs. The dragon-type Pokémon then demonstrated its agility with a swift **Wing Attack**, slicing through the mountain air with precision..."
 ```
 
 ## Prompt Customization
@@ -228,6 +234,14 @@ CREATE TABLE pokemon_cache (
   move_names TEXT NOT NULL,      -- JSON array
   image_png_path TEXT,
   image_svg_path TEXT,
+  generation_id INTEGER NOT NULL,
+  region TEXT NOT NULL,
+  display_name TEXT,             -- Formatted display name
+  species_id INTEGER,            -- Base species ID
+  is_default INTEGER,            -- 1 if default form
+  form_name TEXT,                -- Variant form name
+  variant_category TEXT,         -- 'default' | 'mega' | 'regional' | 'gmax' | 'other'
+  region_name TEXT,              -- Region name for regional variants
   cached_at TEXT NOT NULL
 );
 ```
@@ -254,8 +268,8 @@ CREATE TABLE audio_logs (
   generation_id INTEGER NOT NULL,
   voice TEXT NOT NULL,           -- Voice profile used (e.g., "Kore")
   audio_base64 TEXT NOT NULL,    -- Base64-encoded audio data
-  audio_format TEXT NOT NULL,    -- "pcm_s16le" or "wav"
-  sample_rate INTEGER NOT NULL,  -- 24000 Hz
+  audio_format TEXT NOT NULL,    -- "mp3"
+  bitrate INTEGER NOT NULL,      -- MP3 bitrate in kbps (default: 128)
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -286,6 +300,7 @@ CREATE TABLE jobs (
   message TEXT NOT NULL,
   cooldown_until TEXT,           -- ISO timestamp for rate-limit cooldown
   error TEXT,
+  retry_count INTEGER DEFAULT 0, -- Number of retry attempts
   pokemon_ids TEXT NOT NULL,     -- JSON array of Pokemon IDs to process
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -303,9 +318,10 @@ The application uses a background job runner for processing long-running AI oper
 1. **Client** creates a job with mode, generation, voice, and Pokemon IDs
 2. **Job Runner** polls for queued jobs and processes them server-side
 3. **Processing** happens with enforced cooldowns between API calls:
-   - Summary generation: 15-second cooldown between each Pokemon
-   - TTS generation: 5-minute cooldown between batches (up to 15 summaries per batch)
-4. **Progress** is tracked in the database with real-time status updates
-5. **Controls**: Jobs can be paused, resumed, or canceled at any time
+   - Summary generation: 15-second cooldown between each Pokemon (±20% jitter)
+   - TTS generation: 15-second cooldown between each Pokemon (±20% jitter), one call per Pokemon
+4. **Concurrency**: Up to 3 summary jobs and 1 audio job run simultaneously
+5. **Progress** is tracked in the database with real-time status updates
+6. **Controls**: Jobs can be paused, resumed, or canceled at any time
 
 For detailed architecture information, see [Technical Documentation](./technical-documentation.md).

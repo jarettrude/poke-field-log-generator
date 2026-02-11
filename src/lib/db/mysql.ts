@@ -113,7 +113,9 @@ export class MySQLAdapter implements DatabaseAdapter {
     throw new Error('Not implemented');
   }
 
-  async claimNextQueuedJob(): Promise<{ job: ProcessingJob; pokemonIds: number[] } | null> {
+  async claimNextQueuedJob(
+    _allowedStages?: ProcessingStage[]
+  ): Promise<{ job: ProcessingJob; pokemonIds: number[] } | null> {
     throw new Error('Not implemented');
   }
 
@@ -135,6 +137,10 @@ export class MySQLAdapter implements DatabaseAdapter {
     throw new Error('Not implemented');
   }
 
+  async setJobHeartbeat(_id: string): Promise<void> {
+    throw new Error('Not implemented');
+  }
+
   async setJobError(_id: string, _error: string): Promise<void> {
     throw new Error('Not implemented');
   }
@@ -143,7 +149,25 @@ export class MySQLAdapter implements DatabaseAdapter {
     throw new Error('Not implemented');
   }
 
+  async cancelJobAtomic(
+    _id: string,
+    _stage: ProcessingStage,
+    _current: number,
+    _total: number
+  ): Promise<void> {
+    throw new Error('Not implemented');
+  }
+
   async pauseJob(_id: string): Promise<void> {
+    throw new Error('Not implemented');
+  }
+
+  async pauseJobAtomic(
+    _id: string,
+    _stage: ProcessingStage,
+    _current: number,
+    _total: number
+  ): Promise<void> {
     throw new Error('Not implemented');
   }
 

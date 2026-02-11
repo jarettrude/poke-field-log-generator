@@ -3,7 +3,7 @@
  * Fetches from PokeAPI and caches to SQLite via backend
  */
 
-import { PokemonDetails, PokemonBaseInfo, PokemonSprites, VariantCategory } from '../types';
+import { PokemonBaseInfo, PokemonDetails, VariantCategory } from '../types';
 
 const BASE_URL = 'https://pokeapi.co/api/v2';
 const API_BASE = '/api';
@@ -34,17 +34,6 @@ interface PokemonSpeciesResponse {
   }>;
 }
 
-interface PokemonResponse {
-  id: number;
-  name: string;
-  height: number;
-  weight: number;
-  species: { url: string };
-  sprites: PokemonSprites;
-  types: Array<{ type: { name: string } }>;
-  moves: Array<{ move: { name: string } }>;
-}
-
 interface SpeciesResponse {
   id: number;
   name: string;
@@ -72,28 +61,50 @@ interface FormResponse {
   is_default: boolean;
 }
 
+interface PokemonResponse {
+  id: number;
+  name: string;
+  height: number;
+  weight: number;
+  species: { url: string };
+  sprites: {
+    front_default?: string;
+    other?: {
+      'official-artwork'?: { front_default?: string };
+      home?: { front_default?: string };
+      dream_world?: { front_default?: string };
+    };
+  };
+  types: Array<{ type: { name: string } }>;
+  moves: Array<{ move: { name: string } }>;
+}
+
 // ============================================================================
 // Dynamic Region/Category Detection
 // ============================================================================
 
-let cachedRegionNames: string[] | null = null;
+let regionNamesPromise: Promise<string[]> | null = null;
 
 /**
  * Fetch all region names from PokeAPI dynamically.
  * Used to detect regional forms without hardcoding region names.
+ * Uses a promise-based cache to deduplicate concurrent fetches.
  */
-export async function getRegionNames(): Promise<string[]> {
-  if (cachedRegionNames) return cachedRegionNames;
-
-  const res = await fetch(`${BASE_URL}/region`);
-  if (!res.ok) {
-    console.warn('Failed to fetch regions, using empty list');
-    return [];
+export function getRegionNames(): Promise<string[]> {
+  if (!regionNamesPromise) {
+    regionNamesPromise = (async () => {
+      const res = await fetch(`${BASE_URL}/region`);
+      if (!res.ok) {
+        // Reset so next call retries
+        regionNamesPromise = null;
+        console.warn('Failed to fetch regions, using empty list');
+        return [];
+      }
+      const data = (await res.json()) as { results: Array<{ name: string }> };
+      return data.results.map(r => r.name);
+    })();
   }
-
-  const data = (await res.json()) as { results: Array<{ name: string }> };
-  cachedRegionNames = data.results.map(r => r.name);
-  return cachedRegionNames;
+  return regionNamesPromise;
 }
 
 /**
@@ -422,11 +433,13 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
     .filter((entry: { language: { name: string } }) => entry.language.name === 'en')
     .map((entry: { flavor_text: string }) => entry.flavor_text.replace(/[\n\f]/g, ' '));
 
-  const imagePngUrl =
-    pokemonData.sprites.other['official-artwork'].front_default ??
-    pokemonData.sprites.other.home.front_default ??
-    pokemonData.sprites.front_default;
-  const imageSvgUrl = pokemonData.sprites.other['dream_world'].front_default;
+  // SVG-first priority: dream_world, then PNG fallback
+  const imageSvgUrl = pokemonData.sprites.other?.dream_world?.front_default;
+  const imagePngUrl = imageSvgUrl
+    ? null
+    : (pokemonData.sprites.other?.['official-artwork']?.front_default ??
+      pokemonData.sprites.other?.home?.front_default ??
+      pokemonData.sprites.front_default);
 
   const generationId = parseInt(speciesData.generation.url.split('/').filter(Boolean).pop()!, 10);
 
@@ -449,7 +462,6 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
   if (!isDefault) {
     formName = pokemonData.name.replace(`${speciesData.name}-`, '') || null;
 
-    // Fetch form data for is_mega
     try {
       const formRes = await fetch(`${BASE_URL}/pokemon-form/${pokemonData.name}`);
       if (formRes.ok) {
@@ -464,7 +476,6 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
   const { category: variantCategory, regionName } = await categorizeVariant(formName, isMega);
   const displayName = formatDisplayName(pokemonData.name, formName, variantCategory, regionName);
 
-  // Cache to database (images will be downloaded by backend)
   const saveResponse = await fetch(`${API_BASE}/pokemon/${id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -491,11 +502,9 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
 
   await handleResponse(saveResponse);
 
-  // Fetch again to get local image paths
   const freshCached = await fetch(`${API_BASE}/pokemon/${id}`);
   const freshData = await handleResponse<CachedPokemonResponse>(freshCached);
 
-  // Fallback to URL if freshData is null
   return {
     id: pokemonData.id,
     name: pokemonData.name,
@@ -503,8 +512,8 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
     height: pokemonData.height,
     weight: pokemonData.weight,
     types: pokemonData.types.map(t => t.type.name),
-    imagePng: freshData?.imagePngPath || imagePngUrl,
-    imageSvg: freshData?.imageSvgPath || imageSvgUrl,
+    imagePng: freshData?.imagePngPath || imagePngUrl || null,
+    imageSvg: freshData?.imageSvgPath || imageSvgUrl || null,
     flavorTexts: Array.from(new Set(flavorTexts)),
     allMoveNames: pokemonData.moves.map(m => m.move.name.replace(/-/g, ' ')),
     habitat: speciesData.habitat?.name || 'the unknown wild',

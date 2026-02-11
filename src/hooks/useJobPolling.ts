@@ -55,7 +55,7 @@ export function useJobPolling({
 
   const clearPoll = useCallback(() => {
     if (pollTimer.current) {
-      window.clearInterval(pollTimer.current);
+      window.clearTimeout(pollTimer.current);
       pollTimer.current = null;
     }
   }, []);
@@ -159,6 +159,7 @@ export function useJobPolling({
     }
 
     const poll = async () => {
+      let shouldContinue = true;
       try {
         const job = await getJob(activeJobId);
 
@@ -201,6 +202,7 @@ export function useJobPolling({
         });
 
         if (job.status === 'failed') {
+          shouldContinue = false;
           clearPoll();
           setActiveJobId(null);
           setIsProcessing(false);
@@ -216,6 +218,7 @@ export function useJobPolling({
         }
 
         if (job.status === 'canceled') {
+          shouldContinue = false;
           clearPoll();
           setActiveJobId(null);
           setIsProcessing(false);
@@ -224,6 +227,7 @@ export function useJobPolling({
         }
 
         if (job.status === 'completed') {
+          shouldContinue = false;
           clearPoll();
           setActiveJobId(null);
           setIsProcessing(false);
@@ -239,11 +243,14 @@ export function useJobPolling({
         }
       } catch (e) {
         console.error('Failed to poll job:', e);
+      } finally {
+        if (shouldContinue) {
+          pollTimer.current = window.setTimeout(poll, 1000);
+        }
       }
     };
 
     void poll();
-    pollTimer.current = window.setInterval(poll, 1000);
 
     return () => {
       clearPoll();

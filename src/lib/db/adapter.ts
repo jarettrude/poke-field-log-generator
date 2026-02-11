@@ -172,7 +172,9 @@ export interface DatabaseAdapter {
   // Job operations
   createJob(input: CreateJobInput): Promise<void>;
   getJob(id: string): Promise<ProcessingJob | null>;
-  claimNextQueuedJob(): Promise<{ job: ProcessingJob; pokemonIds: number[] } | null>;
+  claimNextQueuedJob(
+    allowedStages?: ProcessingStage[]
+  ): Promise<{ job: ProcessingJob; pokemonIds: number[] } | null>;
   getAllRunningJobs(): Promise<ProcessingJob[]>;
   setJobStatus(id: string, status: JobStatus): Promise<void>;
   setJobProgress(
@@ -183,10 +185,18 @@ export interface DatabaseAdapter {
     message: string
   ): Promise<void>;
   setJobCooldownUntil(id: string, cooldownUntil: string | null): Promise<void>;
+  setJobHeartbeat(id: string): Promise<void>;
   setJobError(id: string, error: string): Promise<void>;
   incrementJobRetry(id: string): Promise<void>;
   cancelJob(id: string): Promise<void>;
+  cancelJobAtomic(
+    id: string,
+    stage: ProcessingStage,
+    current: number,
+    total: number
+  ): Promise<void>;
   pauseJob(id: string): Promise<void>;
+  pauseJobAtomic(id: string, stage: ProcessingStage, current: number, total: number): Promise<void>;
   resumeJob(id: string): Promise<void>;
   recoverStalledJobs(stalledThresholdMs: number): Promise<number>;
 

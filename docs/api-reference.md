@@ -17,6 +17,7 @@ All endpoints return JSON responses with appropriate HTTP status codes.
 **Success Response:**
 ```json
 {
+  "success": true,
   "data": { ... }
 }
 ```
@@ -24,6 +25,7 @@ All endpoints return JSON responses with appropriate HTTP status codes.
 **Error Response:**
 ```json
 {
+  "success": false,
   "error": "Error message description"
 }
 ```
@@ -47,6 +49,7 @@ POST /api/jobs
 {
   "mode": "FULL" | "SUMMARY_ONLY" | "AUDIO_ONLY",
   "generationId": number,
+  "region": "Kanto" | "Johto" | ...,
   "voice": "Kore" | "Zephyr" | "Charon" | "Puck" | "Fenrir",
   "pokemonIds": number[]
 }
@@ -55,19 +58,10 @@ POST /api/jobs
 **Response:**
 ```json
 {
-  "id": "uuid-string",
-  "status": "queued",
-  "stage": "summary",
-  "mode": "FULL",
-  "generationId": 1,
-  "region": "Kanto",
-  "voice": "Kore",
-  "total": 151,
-  "current": 0,
-  "message": "Job created",
-  "pokemonIds": [1, 2, 3, ...],
-  "createdAt": "2025-01-15T12:00:00.000Z",
-  "updatedAt": "2025-01-15T12:00:00.000Z"
+  "success": true,
+  "data": {
+    "id": "uuid-string"
+  }
 }
 ```
 
@@ -82,21 +76,25 @@ GET /api/jobs/{id}
 **Response:**
 ```json
 {
-  "id": "uuid-string",
-  "status": "running" | "queued" | "paused" | "completed" | "failed" | "canceled",
-  "stage": "summary" | "audio",
-  "mode": "FULL",
-  "generationId": 1,
-  "region": "Kanto",
-  "voice": "Kore",
-  "total": 151,
-  "current": 45,
-  "message": "Processing Pokemon 45 of 151",
-  "cooldownUntil": "2025-01-15T12:05:00.000Z" | null,
-  "error": null | "Error message",
-  "pokemonIds": [1, 2, 3, ...],
-  "createdAt": "2025-01-15T12:00:00.000Z",
-  "updatedAt": "2025-01-15T12:05:00.000Z"
+  "success": true,
+  "data": {
+    "id": "uuid-string",
+    "status": "running" | "queued" | "paused" | "completed" | "failed" | "canceled",
+    "stage": "summary" | "audio",
+    "mode": "FULL",
+    "generationId": 1,
+    "region": "Kanto",
+    "voice": "Kore",
+    "total": 151,
+    "current": 45,
+    "message": "Processing Pokemon 45 of 151",
+    "cooldownUntil": "2025-01-15T12:05:00.000Z" | null,
+    "error": null | "Error message",
+    "retryCount": 0,
+    "pokemonIds": [1, 2, 3, ...],
+    "createdAt": "2025-01-15T12:00:00.000Z",
+    "updatedAt": "2025-01-15T12:05:00.000Z"
+  }
 }
 ```
 
@@ -111,9 +109,8 @@ POST /api/jobs/{id}/pause
 **Response:**
 ```json
 {
-  "id": "uuid-string",
-  "status": "paused",
-  "message": "Job paused"
+  "success": true,
+  "data": { "paused": true }
 }
 ```
 
@@ -128,9 +125,8 @@ POST /api/jobs/{id}/resume
 **Response:**
 ```json
 {
-  "id": "uuid-string",
-  "status": "queued",
-  "message": "Job resumed"
+  "success": true,
+  "data": { "resumed": true }
 }
 ```
 
@@ -145,9 +141,56 @@ POST /api/jobs/{id}/cancel
 **Response:**
 ```json
 {
-  "id": "uuid-string",
-  "status": "canceled",
-  "message": "Job canceled"
+  "success": true,
+  "data": { "canceled": true }
+}
+```
+
+#### Maintenance: Pause All Jobs
+
+Pause all currently running jobs.
+
+```http
+POST /api/jobs/maintenance/pause-all
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": { "pausedCount": 3 }
+}
+```
+
+#### Maintenance: Cancel All Jobs
+
+Cancel all currently running jobs.
+
+```http
+POST /api/jobs/maintenance/cancel-all
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": { "canceledCount": 3 }
+}
+```
+
+#### Maintenance: Recover Stalled Jobs
+
+Recover jobs stuck in running state beyond the stalled threshold (5 minutes).
+
+```http
+POST /api/jobs/maintenance/recover
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": { "recoveredCount": 1 }
 }
 ```
 
@@ -166,37 +209,73 @@ GET /api/pokemon/{id}
 **Response:**
 ```json
 {
-  "id": 1,
-  "name": "Bulbasaur",
-  "height": 7,
-  "weight": 69,
-  "types": ["grass", "poison"],
-  "habitat": "grassland",
-  "flavorTexts": [
-    "A strange seed was planted on its back at birth...",
-    "It can go for days without eating a single morsel..."
-  ],
-  "allMoveNames": ["Tackle", "Vine Whip", "Razor Leaf", ...],
-  "imagePng": "/pokemon/1.png",
-  "imageSvg": "/pokemon/1.svg",
-  "region": "Kanto"
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "bulbasaur",
+    "displayName": "Bulbasaur",
+    "height": 7,
+    "weight": 69,
+    "types": ["grass", "poison"],
+    "habitat": "grassland",
+    "flavorTexts": [
+      "A strange seed was planted on its back at birth...",
+      "It can go for days without eating a single morsel..."
+    ],
+    "moveNames": ["tackle", "vine-whip", "razor-leaf", ...],
+    "imagePngPath": "/pokemon/1.png",
+    "imageSvgPath": "/pokemon/1.svg",
+    "generationId": 1,
+    "region": "Kanto",
+    "speciesId": 1,
+    "isDefault": true,
+    "formName": null,
+    "variantCategory": "default",
+    "regionName": null,
+    "cachedAt": "2025-01-15T12:00:00.000Z"
+  }
 }
 ```
 
+Returns `{ "success": true, "data": null }` if not cached.
+
 #### Cache Pokemon Data
 
-Manually cache Pokemon data (downloads sprites).
+Cache Pokemon data and download sprites.
 
 ```http
 POST /api/pokemon/{id}
 ```
 
-**Response:**
+**Request Body:**
 ```json
 {
   "id": 1,
-  "name": "Bulbasaur",
-  "cached": true
+  "name": "bulbasaur",
+  "displayName": "Bulbasaur",
+  "height": 7,
+  "weight": 69,
+  "types": ["grass", "poison"],
+  "habitat": "grassland",
+  "flavorTexts": ["..."],
+  "moveNames": ["tackle", "vine-whip"],
+  "imagePngUrl": "https://...",
+  "imageSvgUrl": "https://...",
+  "generationId": 1,
+  "region": "Kanto",
+  "speciesId": 1,
+  "isDefault": true,
+  "formName": null,
+  "variantCategory": "default",
+  "regionName": null
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": { "cached": true }
 }
 ```
 
@@ -217,18 +296,21 @@ GET /api/summaries?generationId={number}
 
 **Response:**
 ```json
-[
-  {
-    "id": 1,
-    "name": "Bulbasaur",
-    "summary": "Pokemon trainer log 1. Emerald blades of tall grass...",
-    "region": "Kanto",
-    "generationId": 1,
-    "createdAt": "2025-01-15T12:00:00.000Z",
-    "updatedAt": "2025-01-15T12:00:00.000Z"
-  },
-  ...
-]
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Bulbasaur",
+      "summary": "Pokemon trainer log 1. Emerald blades of tall grass...",
+      "region": "Kanto",
+      "generationId": 1,
+      "createdAt": "2025-01-15T12:00:00.000Z",
+      "updatedAt": "2025-01-15T12:00:00.000Z"
+    },
+    ...
+  ]
+}
 ```
 
 #### Get Summary
@@ -242,13 +324,16 @@ GET /api/summaries/{id}
 **Response:**
 ```json
 {
-  "id": 1,
-  "name": "Bulbasaur",
-  "summary": "Pokemon trainer log 1. Emerald blades of tall grass...",
-  "region": "Kanto",
-  "generationId": 1,
-  "createdAt": "2025-01-15T12:00:00.000Z",
-  "updatedAt": "2025-01-15T12:00:00.000Z"
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Bulbasaur",
+    "summary": "Pokemon trainer log 1. Emerald blades of tall grass...",
+    "region": "Kanto",
+    "generationId": 1,
+    "createdAt": "2025-01-15T12:00:00.000Z",
+    "updatedAt": "2025-01-15T12:00:00.000Z"
+  }
 }
 ```
 
@@ -274,13 +359,8 @@ POST /api/summaries
 **Response:**
 ```json
 {
-  "id": 1,
-  "name": "Bulbasaur",
-  "summary": "Pokemon trainer log 1. Emerald blades of tall grass...",
-  "region": "Kanto",
-  "generationId": 1,
-  "createdAt": "2025-01-15T12:00:00.000Z",
-  "updatedAt": "2025-01-15T12:00:00.000Z"
+  "success": true,
+  "data": { "saved": true }
 }
 ```
 
@@ -296,7 +376,30 @@ DELETE /api/summaries/{id}
 ```json
 {
   "success": true,
-  "id": 1
+  "data": { "deleted": true }
+}
+```
+
+#### Bulk Delete Summaries
+
+Delete multiple summaries by IDs.
+
+```http
+DELETE /api/summaries
+```
+
+**Request Body:**
+```json
+{
+  "ids": [1, 2, 3]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": { "deleted": 3 }
 }
 ```
 
@@ -304,9 +407,9 @@ DELETE /api/summaries/{id}
 
 Manage generated audio narrations.
 
-#### Get All Audio Logs
+#### Get All Audio Logs (Metadata)
 
-Retrieve all audio logs, optionally filtered by generation.
+Retrieve metadata for all audio logs, optionally filtered by generation. The `audioBase64` field is excluded from list responses to prevent large payloads.
 
 ```http
 GET /api/audio?generationId={number}
@@ -317,26 +420,28 @@ GET /api/audio?generationId={number}
 
 **Response:**
 ```json
-[
-  {
-    "id": 1,
-    "name": "Bulbasaur",
-    "region": "Kanto",
-    "generationId": 1,
-    "voice": "Kore",
-    "audioBase64": "base64-encoded-audio-data...",
-    "audioFormat": "wav",
-    "sampleRate": 24000,
-    "createdAt": "2025-01-15T12:00:00.000Z",
-    "updatedAt": "2025-01-15T12:00:00.000Z"
-  },
-  ...
-]
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Bulbasaur",
+      "region": "Kanto",
+      "generationId": 1,
+      "voice": "Kore",
+      "audioFormat": "mp3",
+      "bitrate": 128,
+      "createdAt": "2025-01-15T12:00:00.000Z",
+      "updatedAt": "2025-01-15T12:00:00.000Z"
+    },
+    ...
+  ]
+}
 ```
 
 #### Get Audio Log
 
-Retrieve a specific audio log by Pokemon ID.
+Retrieve a specific audio log by Pokemon ID (includes full audio data).
 
 ```http
 GET /api/audio/{id}
@@ -345,16 +450,19 @@ GET /api/audio/{id}
 **Response:**
 ```json
 {
-  "id": 1,
-  "name": "Bulbasaur",
-  "region": "Kanto",
-  "generationId": 1,
-  "voice": "Kore",
-  "audioBase64": "base64-encoded-audio-data...",
-  "audioFormat": "wav",
-  "sampleRate": 24000,
-  "createdAt": "2025-01-15T12:00:00.000Z",
-  "updatedAt": "2025-01-15T12:00:00.000Z"
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Bulbasaur",
+    "region": "Kanto",
+    "generationId": 1,
+    "voice": "Kore",
+    "audioBase64": "base64-encoded-mp3-data...",
+    "audioFormat": "mp3",
+    "bitrate": 128,
+    "createdAt": "2025-01-15T12:00:00.000Z",
+    "updatedAt": "2025-01-15T12:00:00.000Z"
+  }
 }
 ```
 
@@ -374,25 +482,17 @@ POST /api/audio
   "region": "Kanto",
   "generationId": 1,
   "voice": "Kore",
-  "audioBase64": "base64-encoded-audio-data...",
-  "audioFormat": "wav",
-  "sampleRate": 24000
+  "audioBase64": "base64-encoded-mp3-data...",
+  "audioFormat": "mp3",
+  "bitrate": 128
 }
 ```
 
 **Response:**
 ```json
 {
-  "id": 1,
-  "name": "Bulbasaur",
-  "region": "Kanto",
-  "generationId": 1,
-  "voice": "Kore",
-  "audioBase64": "base64-encoded-audio-data...",
-  "audioFormat": "wav",
-  "sampleRate": 24000,
-  "createdAt": "2025-01-15T12:00:00.000Z",
-  "updatedAt": "2025-01-15T12:00:00.000Z"
+  "success": true,
+  "data": { "saved": true }
 }
 ```
 
@@ -408,7 +508,30 @@ DELETE /api/audio/{id}
 ```json
 {
   "success": true,
-  "id": 1
+  "data": { "deleted": true }
+}
+```
+
+#### Bulk Delete Audio Logs
+
+Delete multiple audio logs by IDs.
+
+```http
+DELETE /api/audio
+```
+
+**Request Body:**
+```json
+{
+  "ids": [1, 2, 3]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": { "deleted": 3 }
 }
 ```
 
@@ -427,18 +550,21 @@ GET /api/prompts
 **Response:**
 ```json
 {
-  "summary": {
-    "type": "summary",
-    "content": "Custom summary prompt...",
-    "createdAt": "2025-01-15T12:00:00.000Z",
-    "updatedAt": "2025-01-15T12:00:00.000Z"
-  },
-  "tts": {
-    "type": "tts",
-    "content": "Custom TTS prompt...",
-    "createdAt": "2025-01-15T12:00:00.000Z",
-    "updatedAt": "2025-01-15T12:00:00.000Z"
-  }
+  "success": true,
+  "data": [
+    {
+      "type": "summary",
+      "content": "Custom summary prompt...",
+      "createdAt": "2025-01-15T12:00:00.000Z",
+      "updatedAt": "2025-01-15T12:00:00.000Z"
+    },
+    {
+      "type": "tts",
+      "content": "Custom TTS prompt...",
+      "createdAt": "2025-01-15T12:00:00.000Z",
+      "updatedAt": "2025-01-15T12:00:00.000Z"
+    }
+  ]
 }
 ```
 
@@ -456,12 +582,17 @@ GET /api/prompts/{type}
 **Response:**
 ```json
 {
-  "type": "summary",
-  "content": "Custom summary prompt...",
-  "createdAt": "2025-01-15T12:00:00.000Z",
-  "updatedAt": "2025-01-15T12:00:00.000Z"
+  "success": true,
+  "data": {
+    "type": "summary",
+    "content": "Custom summary prompt...",
+    "createdAt": "2025-01-15T12:00:00.000Z",
+    "updatedAt": "2025-01-15T12:00:00.000Z"
+  }
 }
 ```
+
+Returns `{ "success": true, "data": null }` if no override exists.
 
 #### Save or Update Prompt
 
@@ -482,10 +613,8 @@ POST /api/prompts
 **Response:**
 ```json
 {
-  "type": "summary",
-  "content": "Custom prompt content...",
-  "createdAt": "2025-01-15T12:00:00.000Z",
-  "updatedAt": "2025-01-15T12:00:00.000Z"
+  "success": true,
+  "data": { "saved": true }
 }
 ```
 
@@ -504,7 +633,7 @@ DELETE /api/prompts?type={type}
 ```json
 {
   "success": true,
-  "type": "summary"
+  "data": { "deleted": true }
 }
 ```
 
@@ -570,8 +699,9 @@ const GENERATION_REGIONS: Record<number, string> = {
 
 The application enforces server-side rate limits to comply with Gemini API restrictions:
 
-- **Summary Generation:** 15-second cooldown between each Pokemon
-- **TTS Generation:** 5-minute cooldown between batches (up to 15 summaries per batch)
+- **Summary Generation:** 15-second cooldown between each Pokemon (with ±20% jitter)
+- **TTS Generation:** 15-second cooldown between each Pokemon (with ±20% jitter), one TTS call per Pokemon
+- **Concurrency:** Up to 3 concurrent summary jobs, 1 concurrent audio job
 
 Cooldown information is included in job status responses via the `cooldownUntil` field.
 
