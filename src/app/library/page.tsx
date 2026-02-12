@@ -14,7 +14,7 @@ import {
 } from '@/components';
 import { ProcessedPokemon } from '@/types';
 import { useSavedData } from '@/hooks/useSavedData';
-import { useJobPolling } from '@/hooks/useJobPolling';
+import { useJobStream } from '@/hooks/useJobStream';
 
 type LibraryView = 'library' | 'results';
 
@@ -24,6 +24,7 @@ function LibraryPageInner() {
   const [selectedVoice, setSelectedVoice] = useState('Kore');
   const [currentView, setCurrentView] = useState<LibraryView>('library');
   const [results, setResults] = useState<ProcessedPokemon[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     activeJobId,
@@ -34,9 +35,10 @@ function LibraryPageInner() {
     cooldown,
     setIsProcessing,
     setCooldown,
-  } = useJobPolling({
+  } = useJobStream({
     onJobComplete: jobResults => {
       refreshData();
+      setErrorMessage(null);
       if (jobResults.length > 0) {
         setResults(jobResults);
         setCurrentView('results');
@@ -48,6 +50,12 @@ function LibraryPageInner() {
           description: 'Audio generation completed but produced no results.',
         });
       }
+    },
+    onJobFailed: (error, partialResults) => {
+      refreshData();
+      setErrorMessage(error);
+      setResults(partialResults);
+      setCurrentView('results');
     },
     onJobCanceled: () => {
       setCurrentView('library');
@@ -144,12 +152,15 @@ function LibraryPageInner() {
             results={results}
             onClear={() => {
               setResults([]);
+              setErrorMessage(null);
               setCurrentView('library');
             }}
             onBack={() => {
+              setErrorMessage(null);
               refreshData();
               setCurrentView('library');
             }}
+            errorMessage={errorMessage}
           />
         )}
       </main>
@@ -158,7 +169,6 @@ function LibraryPageInner() {
         <ProcessingOverlay
           progress={progress}
           cooldown={cooldown}
-          currentSummary={null}
           isPaused={isPaused}
           onPause={() => void handlePause()}
           onResume={() => void handleResume()}

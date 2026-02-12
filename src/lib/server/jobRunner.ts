@@ -4,11 +4,19 @@
  * The runner polls the database for queued jobs, claims them atomically, and
  * processes them through summary generation and/or audio synthesis stages.
  * Supports pause/resume/cancel controls and enforces cooldowns between API calls.
+ *
+ * Progress is pushed to clients in real-time via SSE (jobEvents emitter).
+ * DB writes persist state for crash recovery; SSE events drive the UI.
  */
 
 import { getDatabase } from '@/lib/db/adapter';
 import type { ProcessingJob, ProcessingStage } from '@/lib/db/adapter';
-import { generateSummary, generateTts } from './gemini';
+import {
+  generateSummary,
+  generateTts,
+  resetBatchQuotaState,
+  TtsQuotaExhaustedError,
+} from './gemini';
 import {
   jitteredCooldown,
   SERVER_SUMMARY_COOLDOWN_MS,
@@ -19,6 +27,7 @@ import {
 } from './config';
 import { convertPcmToMp3 } from './audioConverter';
 import { getOrFetchPokemonDetailsServer } from './pokemon';
+import { jobEvents } from './jobEvents';
 
 const globalRunner = globalThis as unknown as {
   __jobRunnerStarted?: boolean;
@@ -44,6 +53,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Sleep with periodic checks for pause/cancel.
+ * No heartbeat writes — SSE makes them unnecessary.
+ * Only reads DB to detect status changes from REST commands.
+ */
 async function sleepWithJobControl(
   jobId: string,
   durationMs: number
@@ -55,22 +69,35 @@ async function sleepWithJobControl(
     if (!job) return 'canceled';
     if (job.status === 'canceled' || job.status === 'failed') return 'canceled';
     if (job.status === 'paused') return 'paused';
-    // Heartbeat: touch updated_at so recoverStalledJobs doesn't resurrect active jobs
-    await db.setJobHeartbeat(jobId);
-    await sleep(1000);
+    await sleep(2000);
   }
   return 'ok';
 }
 
+/**
+ * Persist progress to DB and push to SSE subscribers in one call.
+ */
 async function setProgress(params: {
   jobId: string;
   stage: ProcessingStage;
   current: number;
   total: number;
   message: string;
+  cooldownUntil?: string | null;
 }): Promise<void> {
   const db = await getDatabase();
   await db.setJobProgress(params.jobId, params.stage, params.current, params.total, params.message);
+
+  jobEvents.emit(params.jobId, {
+    type: 'progress',
+    jobId: params.jobId,
+    status: 'running',
+    stage: params.stage,
+    current: params.current,
+    total: params.total,
+    message: params.message,
+    cooldownUntil: params.cooldownUntil ?? null,
+  });
 }
 
 type SummaryItem = {
@@ -162,6 +189,14 @@ async function processSummaryStage(job: ProcessingJob): Promise<'ok' | 'paused' 
       const cooldownMs = jitteredCooldown(SERVER_SUMMARY_COOLDOWN_MS);
       const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
       await db.setJobCooldownUntil(job.id, cooldownUntil);
+      await setProgress({
+        jobId: job.id,
+        stage: 'summary',
+        current: idx + 1,
+        total,
+        message: 'Cooling down...',
+        cooldownUntil,
+      });
       const result = await sleepWithJobControl(job.id, cooldownMs);
       await db.setJobCooldownUntil(job.id, null);
       if (result !== 'ok') return result;
@@ -176,9 +211,16 @@ async function processSummaryStage(job: ProcessingJob): Promise<'ok' | 'paused' 
  *
  * Batching was removed because Gemini TTS model truncates/ignores
  * most of the input when given combined text with multiple entries.
+ *
+ * Batch-level quota tracking: resetBatchQuotaState() is called at the
+ * start so each new batch gets a fresh chance at Pro. If both Pro and
+ * Flash daily quotas are exhausted mid-batch, TtsQuotaExhaustedError
+ * is thrown and we save partial progress + a user-friendly error.
  */
 async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 'canceled'> {
   const db = await getDatabase();
+
+  resetBatchQuotaState();
 
   const summaries: SummaryItem[] = [];
   for (const pokemonId of job.pokemonIds) {
@@ -223,40 +265,67 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
       message: `Synthesizing audio for #${summary.id} ${summary.name}...`,
     });
 
-    const audioData = await generateTts({
-      text: summary.summary,
-      voiceName: job.voice,
-    });
+    try {
+      const audioData = await generateTts({
+        text: summary.summary,
+        voiceName: job.voice,
+      });
 
-    const mp3Data = await convertPcmToMp3(
-      audioData,
-      SERVER_TTS_SAMPLE_RATE,
-      SERVER_TTS_MP3_BITRATE
-    );
+      const mp3Data = await convertPcmToMp3(
+        audioData,
+        SERVER_TTS_SAMPLE_RATE,
+        SERVER_TTS_MP3_BITRATE
+      );
 
-    await db.saveAudioLog({
-      id: summary.id,
-      name: summary.name,
-      region: summary.region,
-      generationId: summary.generationId,
-      voice: job.voice,
-      audioBase64: mp3Data,
-      audioFormat: SERVER_TTS_AUDIO_FORMAT,
-      bitrate: SERVER_TTS_MP3_BITRATE,
-    });
+      await db.saveAudioLog({
+        id: summary.id,
+        name: summary.name,
+        region: summary.region,
+        generationId: summary.generationId,
+        voice: job.voice,
+        audioBase64: mp3Data,
+        audioFormat: SERVER_TTS_AUDIO_FORMAT,
+        bitrate: SERVER_TTS_MP3_BITRATE,
+      });
 
-    await setProgress({
-      jobId: job.id,
-      stage: 'audio',
-      current: idx + 1,
-      total,
-      message: `Saved audio for #${summary.id} ${summary.name}.`,
-    });
+      await setProgress({
+        jobId: job.id,
+        stage: 'audio',
+        current: idx + 1,
+        total,
+        message: `Saved audio for #${summary.id} ${summary.name}.`,
+      });
+    } catch (ttsError) {
+      if (ttsError instanceof TtsQuotaExhaustedError) {
+        const completed = idx;
+        const errorMsg =
+          `Daily API quota exceeded: ${completed} of ${total} audio files were generated successfully. ` +
+          `The remaining ${total - completed} could not be processed because both TTS models ` +
+          `(Pro and Flash) have hit their daily limits. Quotas reset at midnight Pacific Time.`;
+        await setProgress({
+          jobId: job.id,
+          stage: 'audio',
+          current: completed,
+          total,
+          message: errorMsg,
+        });
+        throw new Error(errorMsg);
+      }
+      throw ttsError;
+    }
 
     if (idx < summaries.length - 1) {
       const cooldownMs = jitteredCooldown(SERVER_TTS_COOLDOWN_MS);
       const cooldownUntil = new Date(Date.now() + cooldownMs).toISOString();
       await db.setJobCooldownUntil(job.id, cooldownUntil);
+      await setProgress({
+        jobId: job.id,
+        stage: 'audio',
+        current: idx + 1,
+        total,
+        message: 'Cooling down...',
+        cooldownUntil,
+      });
       const result = await sleepWithJobControl(job.id, cooldownMs);
       await db.setJobCooldownUntil(job.id, null);
       if (result !== 'ok') return result;
@@ -266,6 +335,53 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
   return 'ok';
 }
 
+/**
+ * Convert raw API error messages into user-friendly descriptions.
+ * The error stored in the DB is shown directly to the user on the results page.
+ */
+function formatUserFriendlyError(rawMessage: string): string {
+  if (rawMessage.includes('Daily API quota exceeded:')) {
+    return rawMessage;
+  }
+
+  if (rawMessage.includes('429') || rawMessage.includes('RESOURCE_EXHAUSTED')) {
+    if (
+      rawMessage.includes('PerDay') ||
+      rawMessage.includes('per_day') ||
+      rawMessage.includes('daily')
+    ) {
+      return 'Daily API rate limit reached. The Gemini API has a daily request cap that has been exceeded. Quotas reset at midnight Pacific Time. Please try again tomorrow.';
+    }
+    return 'API rate limit reached (too many requests per minute). The system retried automatically but the limit persisted. Please wait a few minutes and try again.';
+  }
+
+  if (rawMessage.includes('503') || rawMessage.includes('overloaded')) {
+    return "The Gemini API is temporarily overloaded (503 Service Unavailable). This is a temporary issue on Google's end. Please try again in a few minutes.";
+  }
+
+  if (rawMessage.includes('500')) {
+    return "The Gemini API returned an internal server error (500). This is a temporary issue on Google's end. Please try again shortly.";
+  }
+
+  if (rawMessage.includes('Missing GEMINI_API_KEY')) {
+    return 'API key not configured. Please set the GEMINI_API_KEY environment variable.';
+  }
+
+  if (rawMessage.includes('Missing saved summary')) {
+    return rawMessage;
+  }
+
+  if (rawMessage.length > 300) {
+    return rawMessage.substring(0, 297) + '...';
+  }
+
+  return rawMessage;
+}
+
+/**
+ * Execute a single job through its summary and/or audio stages.
+ * Emits SSE events for progress and terminal states.
+ */
 async function processJob(job: ProcessingJob): Promise<void> {
   const db = await getDatabase();
 
@@ -288,10 +404,16 @@ async function processJob(job: ProcessingJob): Promise<void> {
           total: fresh.pokemonIds.length,
           message: 'Completed summary generation.',
         });
+        jobEvents.emit(fresh.id, {
+          type: 'completed',
+          jobId: fresh.id,
+          generationId: fresh.generationId,
+          pokemonIds: fresh.pokemonIds,
+          mode: fresh.mode,
+        });
         return;
       }
 
-      // Atomically transition stage in DB first, then update in-memory state
       await db.setJobProgress(
         fresh.id,
         'audio',
@@ -301,6 +423,16 @@ async function processJob(job: ProcessingJob): Promise<void> {
       );
       await db.setJobCooldownUntil(fresh.id, null);
       activeJobStages.set(fresh.id, 'audio');
+      jobEvents.emit(fresh.id, {
+        type: 'progress',
+        jobId: fresh.id,
+        status: 'running',
+        stage: 'audio',
+        current: 0,
+        total: fresh.pokemonIds.length,
+        message: 'Preparing audio synthesis...',
+        cooldownUntil: null,
+      });
 
       const audioJob = await db.getJob(fresh.id);
       if (!audioJob) return;
@@ -316,6 +448,13 @@ async function processJob(job: ProcessingJob): Promise<void> {
         current: audioJob.total,
         total: audioJob.total,
         message: 'Completed audio synthesis.',
+      });
+      jobEvents.emit(audioJob.id, {
+        type: 'completed',
+        jobId: audioJob.id,
+        generationId: audioJob.generationId,
+        pokemonIds: audioJob.pokemonIds,
+        mode: audioJob.mode,
       });
       return;
     }
@@ -333,22 +472,44 @@ async function processJob(job: ProcessingJob): Promise<void> {
         total: fresh.total,
         message: 'Completed audio synthesis.',
       });
+      jobEvents.emit(fresh.id, {
+        type: 'completed',
+        jobId: fresh.id,
+        generationId: fresh.generationId,
+        pokemonIds: fresh.pokemonIds,
+        mode: fresh.mode,
+      });
     }
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    await db.setJobError(job.id, msg);
+    const rawMsg = e instanceof Error ? e.message : String(e);
+    const friendlyMsg = formatUserFriendlyError(rawMsg);
+    await db.setJobError(job.id, friendlyMsg);
     await db.setJobCooldownUntil(job.id, null);
+    const failedJob = await db.getJob(job.id);
+    if (failedJob) {
+      jobEvents.emit(job.id, {
+        type: 'failed',
+        jobId: job.id,
+        error: friendlyMsg,
+        generationId: failedJob.generationId,
+        pokemonIds: failedJob.pokemonIds,
+        mode: failedJob.mode,
+      });
+    }
   }
 }
 
 let tickInProgress = false;
 
+/**
+ * Poll for the next queued job and start processing it if capacity allows.
+ */
 async function tick(): Promise<void> {
   if (tickInProgress) return;
   tickInProgress = true;
 
   try {
-    // Use in-memory activeJobs as source of truth for concurrency (DB can be stale)
+    // Count active jobs by stage
     let activeTextJobs = 0;
     let activeAudioJobs = 0;
     for (const id of activeJobs.keys()) {
@@ -374,7 +535,6 @@ async function tick(): Promise<void> {
 
     const job = claimed.job;
 
-    // Skip if this job is somehow already being processed in memory
     if (activeJobs.has(job.id)) {
       return;
     }
@@ -393,6 +553,9 @@ async function tick(): Promise<void> {
 
 const STALLED_JOB_THRESHOLD_MS = 5 * 60 * 1000;
 
+/**
+ * Recover jobs stuck in 'running' state beyond the stalled threshold.
+ */
 async function checkStalledJobs(): Promise<void> {
   try {
     const db = await getDatabase();
@@ -405,6 +568,9 @@ async function checkStalledJobs(): Promise<void> {
   }
 }
 
+/**
+ * Initialize the singleton job runner. Starts the tick loop and stalled job recovery.
+ */
 export function startJobRunner(): void {
   if (globalRunner.__jobRunnerStarted) return;
   globalRunner.__jobRunnerStarted = true;

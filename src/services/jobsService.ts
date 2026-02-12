@@ -3,14 +3,7 @@
  * Provides API client functions for creating, monitoring, and controlling jobs.
  */
 
-import { ProcessingJob as DBProcessingJob } from '@/lib/db/adapter';
-
 const API_BASE = '/api/jobs';
-
-export type ProcessingStage = 'summary' | 'audio';
-export type JobStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'canceled';
-
-export type ProcessingJob = DBProcessingJob;
 
 interface ApiResponse<T> {
   success: boolean;
@@ -32,7 +25,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
  * Create a new processing job and return its ID.
  */
 export async function createJob(params: {
-  mode: ProcessingJob['mode'];
+  mode: 'FULL' | 'SUMMARY_ONLY' | 'AUDIO_ONLY';
   generationId: number;
   region: string;
   voice: string;
@@ -46,14 +39,6 @@ export async function createJob(params: {
 
   const data = await handleResponse<{ id: string }>(response);
   return data.id;
-}
-
-/**
- * Fetch the current state of a job by ID.
- */
-export async function getJob(id: string): Promise<ProcessingJob> {
-  const response = await fetch(`${API_BASE}/${id}`);
-  return handleResponse<ProcessingJob>(response);
 }
 
 /**

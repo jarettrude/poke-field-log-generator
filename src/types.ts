@@ -103,11 +103,6 @@ export interface CooldownState {
   active: boolean;
   remainingMs: number;
   flavorText: string;
-  currentSummary?: {
-    id: number;
-    name: string;
-    text: string;
-  };
 }
 
 /** Pokemon sprites structure from PokeAPI */

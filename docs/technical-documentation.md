@@ -11,7 +11,7 @@ The application is built on Next.js 16 with a job-based processing architecture 
 **Frontend (Client-Side)**
 - React 19 components with TypeScript
 - Service layer for API communication
-- Real-time job status polling
+- Real-time job progress via Server-Sent Events (SSE)
 - Local state management
 
 **Backend (Server-Side)**
@@ -48,7 +48,7 @@ src/
 │   ├── ThemeProvider.tsx    # Theme context provider
 │   └── ToastProvider.tsx    # Toast notification system
 ├── hooks/
-│   ├── useJobPolling.ts     # Job status polling + progress tracking
+│   ├── useJobStream.ts      # Real-time job progress via SSE (EventSource)
 │   ├── usePokemonData.ts    # Pokemon data fetching + caching
 │   └── useSavedData.ts      # Saved summaries/audio state
 ├── services/
@@ -66,6 +66,7 @@ src/
 │   │   └── mysql.ts         # MySQL database adapter (placeholder)
 │   └── server/
 │       ├── jobRunner.ts     # Background job processor
+│       ├── jobEvents.ts     # SSE event emitter (globalThis singleton)
 │       ├── gemini.ts        # Gemini AI client (text + TTS)
 │       ├── pokemon.ts       # Server-side Pokemon data fetching
 │       ├── audioConverter.ts # PCM to MP3 conversion via ffmpeg
@@ -186,15 +187,44 @@ CREATE TABLE jobs (
 
 ## Job Processing System
 
-The job-based architecture handles long-running AI operations without blocking the UI.
+The job-based architecture handles long-running AI operations without blocking the UI. Real-time progress is delivered to clients via Server-Sent Events (SSE).
 
 ### Job Lifecycle
 
-1. **Creation** - Client creates job via `POST /api/jobs`
-2. **Queuing** - Job enters queue with status `queued`
-3. **Processing** - Job runner picks up job and sets status to `running`
-4. **Progress** - Job updates progress and status in database
-5. **Completion** - Job finishes with status `completed`, `failed`, or `canceled`
+1. **Creation** — Client creates job via `POST /api/jobs`
+2. **Queuing** — Job enters queue with status `queued`
+3. **SSE Connect** — Client opens `EventSource` to `GET /api/jobs/{id}/stream`
+4. **Processing** — Job runner picks up job, sets status to `running`, emits progress events
+5. **Completion** — Job finishes with a terminal SSE event (`completed`, `failed`, or `canceled`)
+
+### Real-Time Updates (SSE)
+
+The application uses Server-Sent Events instead of HTTP polling for real-time job progress. This eliminates frequent database reads/writes and provides instant UI updates.
+
+**Architecture:**
+```
+jobRunner → jobEvents.emit() → SSE endpoint → EventSource → useJobStream → React UI
+                                     ↑
+REST (pause/cancel/resume) ──────────┘
+```
+
+**Key components:**
+- `lib/server/jobEvents.ts` — `globalThis`-based `JobEventEmitter` singleton shared across Next.js module re-evaluations and HMR
+- `api/jobs/[id]/stream/route.ts` — SSE endpoint using `ReadableStream`. Sends initial state on connect, subscribes to live events, 30-second keepalive comments
+- `hooks/useJobStream.ts` — Client hook using browser `EventSource` API with auto-reconnect
+
+**SSE Event Types:**
+- `progress` — Stage, current/total counts, message, cooldown timestamp
+- `completed` — Job finished successfully (includes generationId, pokemonIds, mode)
+- `failed` — Job failed with error message and partial result metadata
+- `canceled` — Job was canceled by user
+- `paused` / `resumed` — Job pause state changed
+
+**Design decisions:**
+- DB writes still happen alongside SSE events for crash recovery persistence
+- REST endpoints (pause/cancel/resume) also emit SSE events for instant UI feedback
+- No heartbeat mechanism — SSE keepalive comments prevent proxy/browser timeouts
+- `sleepWithJobControl` only reads DB for pause/cancel status checks (no writes)
 
 ### Job Runner
 
@@ -204,10 +234,10 @@ The background job runner (`lib/server/jobRunner.ts`) polls for queued jobs ever
 - Stage-aware job claiming (only claims jobs matching available capacity)
 - Concurrency limits: 3 concurrent summary jobs, 1 concurrent audio job
 - Automatic cooldown management with jitter between API calls
-- Heartbeat mechanism to prevent stalled job false positives
 - Pause/resume/cancel support with atomic state transitions
 - Error handling and retry logic with exponential backoff
-- Progress tracking
+- User-friendly error formatting for API errors displayed on the results page
+- SSE event emission at every progress point and terminal state
 
 **Cooldown Periods:**
 - Summary generation: 15 seconds between Pokemon (±20% jitter)
@@ -215,11 +245,11 @@ The background job runner (`lib/server/jobRunner.ts`) polls for queued jobs ever
 
 ### Job Control
 
-Jobs can be controlled through API endpoints:
+Jobs can be controlled through REST API endpoints. Each endpoint also emits an SSE event for instant client notification:
 
-- `POST /api/jobs/{id}/pause` - Pause a running job
-- `POST /api/jobs/{id}/resume` - Resume a paused job
-- `POST /api/jobs/{id}/cancel` - Cancel a job
+- `POST /api/jobs/{id}/pause` — Pause a running job
+- `POST /api/jobs/{id}/resume` — Resume a paused job
+- `POST /api/jobs/{id}/cancel` — Cancel a job
 
 ## Gemini AI Integration
 
@@ -261,6 +291,16 @@ Available Moves: {moves}
 - Strategy: Pro-first with Flash fallback. Max 4 API calls per Pokemon (1+1 retry on Pro, 1+1 retry on Flash)
 - Daily quota exhaustion triggers immediate fallback (no retries)
 
+**Batch-Level Quota Tracking:**
+
+Within a single batch, once a model's daily quota is exhausted it is skipped for all remaining items. This avoids wasting API calls on a model known to be maxed out.
+
+- `resetBatchQuotaState()` is called at the start of every new audio batch
+- If Pro is exhausted mid-batch, all remaining items use Flash directly
+- If both Pro and Flash are exhausted, `TtsQuotaExhaustedError` is thrown
+- The job runner catches this error, saves partial progress, and displays a user-friendly message on the results page
+- Quotas reset at midnight Pacific Time
+
 **Director's Notes:**
 The TTS prompt includes detailed director's notes for voice styling:
 - Style: Nature documentary narration
@@ -293,13 +333,31 @@ The TTS prompt includes detailed director's notes for voice styling:
 ### Audio Generation
 
 1. Client creates job with mode `FULL` or `AUDIO_ONLY`
-2. Job runner fetches existing summary for each Pokemon
+2. Job runner resets batch quota state and fetches existing summary for each Pokemon
 3. Constructs TTS prompt with director's notes
-4. Calls Gemini TTS API (one call per Pokemon, Pro-first with Flash fallback)
+4. Calls Gemini TTS API (one call per Pokemon, Pro-first with Flash fallback, batch-level quota tracking)
 5. Converts PCM response to MP3 via ffmpeg
 6. Saves audio to database as base64-encoded MP3
 7. Enforces 15-second cooldown between Pokemon
-8. Updates job progress
+8. Emits SSE progress events in real-time
+9. On completion or failure, emits terminal SSE event with result metadata
+
+### Error Handling
+
+When a job fails, the system:
+1. Converts raw API error messages into user-friendly descriptions via `formatUserFriendlyError()`
+2. Stores the friendly error in the database
+3. Emits a `failed` SSE event with the error message, generationId, pokemonIds, and mode
+4. The client builds partial results from whatever was successfully generated
+5. Redirects to the `ResultsView` with an error banner and any partial results
+
+**Recognized error patterns:**
+- Daily API quota exhaustion (429 + PerDay indicators)
+- Per-minute rate limits (429 + PerMinute indicators)
+- Service overload (503)
+- Internal server errors (500)
+- Missing API key configuration
+- TTS quota exhaustion across both models
 
 ## Environment Configuration
 

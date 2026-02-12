@@ -1,5 +1,10 @@
+/**
+ * Resume a paused job. Emits a resumed SSE event for instant UI feedback.
+ */
+
 import { getDatabase } from '@/lib/db/adapter';
 import { successResponse, errorResponse } from '@/lib/server/api';
+import { jobEvents } from '@/lib/server/jobEvents';
 
 export const runtime = 'nodejs';
 
@@ -17,6 +22,8 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
     await db.resumeJob(id);
     await db.setJobCooldownUntil(id, null);
+
+    jobEvents.emit(id, { type: 'resumed', jobId: id });
 
     return successResponse({ resumed: true });
   } catch (error) {

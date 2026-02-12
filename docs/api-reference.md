@@ -100,7 +100,7 @@ GET /api/jobs/{id}
 
 #### Pause Job
 
-Pause a running job.
+Pause a running job. Also emits a `paused` SSE event for instant client notification.
 
 ```http
 POST /api/jobs/{id}/pause
@@ -116,7 +116,7 @@ POST /api/jobs/{id}/pause
 
 #### Resume Job
 
-Resume a paused job.
+Resume a paused job. Also emits a `resumed` SSE event for instant client notification.
 
 ```http
 POST /api/jobs/{id}/resume
@@ -132,7 +132,7 @@ POST /api/jobs/{id}/resume
 
 #### Cancel Job
 
-Cancel a job.
+Cancel a job. Also emits a `canceled` SSE event for instant client notification.
 
 ```http
 POST /api/jobs/{id}/cancel
@@ -144,6 +144,49 @@ POST /api/jobs/{id}/cancel
   "success": true,
   "data": { "canceled": true }
 }
+```
+
+#### Stream Job Progress (SSE)
+
+Open a Server-Sent Events stream for real-time job progress updates. The server sends the current job state immediately on connect, then pushes events as they occur. The stream closes automatically on terminal events (`completed`, `failed`, `canceled`).
+
+```http
+GET /api/jobs/{id}/stream
+```
+
+**Headers:**
+```
+Content-Type: text/event-stream
+Cache-Control: no-cache, no-transform
+Connection: keep-alive
+```
+
+**Event Format:**
+Each event is a JSON object sent as an SSE `data` field:
+
+```
+data: {"type":"progress","jobId":"...","status":"running","stage":"summary","current":3,"total":10,"message":"Generating summary for #4...","cooldownUntil":null}
+
+data: {"type":"completed","jobId":"...","generationId":1,"pokemonIds":[1,2,3],"mode":"FULL"}
+
+data: {"type":"failed","jobId":"...","error":"Daily API quota exceeded...","generationId":1,"pokemonIds":[1,2,3],"mode":"FULL"}
+
+data: {"type":"canceled","jobId":"..."}
+
+data: {"type":"paused","jobId":"..."}
+
+data: {"type":"resumed","jobId":"..."}
+```
+
+A keepalive comment (`: keepalive`) is sent every 30 seconds to prevent proxy/browser timeouts.
+
+**Client Usage:**
+```typescript
+const es = new EventSource(`/api/jobs/${jobId}/stream`);
+es.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  // Handle data.type: 'progress' | 'completed' | 'failed' | 'canceled' | 'paused' | 'resumed'
+};
 ```
 
 #### Maintenance: Pause All Jobs

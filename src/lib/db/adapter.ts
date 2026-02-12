@@ -185,7 +185,6 @@ export interface DatabaseAdapter {
     message: string
   ): Promise<void>;
   setJobCooldownUntil(id: string, cooldownUntil: string | null): Promise<void>;
-  setJobHeartbeat(id: string): Promise<void>;
   setJobError(id: string, error: string): Promise<void>;
   incrementJobRetry(id: string): Promise<void>;
   cancelJob(id: string): Promise<void>;

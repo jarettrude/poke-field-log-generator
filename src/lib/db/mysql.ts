@@ -137,10 +137,6 @@ export class MySQLAdapter implements DatabaseAdapter {
     throw new Error('Not implemented');
   }
 
-  async setJobHeartbeat(_id: string): Promise<void> {
-    throw new Error('Not implemented');
-  }
-
   async setJobError(_id: string, _error: string): Promise<void> {
     throw new Error('Not implemented');
   }

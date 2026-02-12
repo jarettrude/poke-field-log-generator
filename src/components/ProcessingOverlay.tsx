@@ -14,7 +14,6 @@ interface ProcessingOverlayProps {
     currentPokemonImage?: string;
   };
   cooldown: CooldownState | null;
-  currentSummary: string | null;
   isPaused: boolean;
   onPause: () => void;
   onResume: () => void;
@@ -24,7 +23,6 @@ interface ProcessingOverlayProps {
 export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
   progress,
   cooldown,
-  currentSummary,
   isPaused,
   onPause,
   onResume,
@@ -120,15 +118,6 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
               </div>
               <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                 {flavorText}
-              </p>
-            </div>
-          )}
-
-          {/* Current Summary Preview */}
-          {currentSummary && !cooldown?.active && (
-            <div className="card mx-auto max-h-40 max-w-md overflow-y-auto text-left">
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                {currentSummary}
               </p>
             </div>
           )}

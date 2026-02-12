@@ -1,5 +1,10 @@
+/**
+ * Pause a running job. Emits a paused SSE event for instant UI feedback.
+ */
+
 import { getDatabase } from '@/lib/db/adapter';
 import { successResponse, errorResponse } from '@/lib/server/api';
+import { jobEvents } from '@/lib/server/jobEvents';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +21,8 @@ export async function POST(_request: Request, { params }: RouteParams) {
     if (!job) return errorResponse('Job not found', 404);
 
     await db.pauseJobAtomic(id, job.stage, job.current, job.total);
+
+    jobEvents.emit(id, { type: 'paused', jobId: id });
 
     return successResponse({ paused: true });
   } catch (error) {

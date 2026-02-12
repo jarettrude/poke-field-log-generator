@@ -15,7 +15,7 @@ import {
 } from '@/components';
 
 import { ProcessedPokemon, WorkflowMode } from '@/types';
-import { useJobPolling } from '@/hooks/useJobPolling';
+import { useJobStream } from '@/hooks/useJobStream';
 import { usePokemonData } from '@/hooks/usePokemonData';
 import { useSavedData } from '@/hooks/useSavedData';
 
@@ -29,8 +29,8 @@ function GeneratorPageInner() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [selectedVoice, setSelectedVoice] = useState('Kore');
-  const [currentSummary, setCurrentSummary] = useState<string | null>(null);
   const [results, setResults] = useState<ProcessedPokemon[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     generations,
@@ -61,9 +61,10 @@ function GeneratorPageInner() {
     cooldown,
     setIsProcessing,
     setCooldown,
-  } = useJobPolling({
+  } = useJobStream({
     onJobComplete: jobResults => {
       refreshSavedData();
+      setErrorMessage(null);
 
       // All modes go to results view if there are any results
       if (jobResults.length > 0) {
@@ -73,6 +74,12 @@ function GeneratorPageInner() {
         // If no results (shouldn't happen normally), go back to select
         setCurrentView('select');
       }
+    },
+    onJobFailed: (error, partialResults) => {
+      refreshSavedData();
+      setErrorMessage(error);
+      setResults(partialResults);
+      setCurrentView('results');
     },
     onJobCanceled: () => {
       setCurrentView('select');
@@ -120,7 +127,6 @@ function GeneratorPageInner() {
     }
 
     setIsProcessing(true);
-    setCurrentSummary(null);
     setCurrentView('processing');
 
     const mode =
@@ -210,8 +216,15 @@ function GeneratorPageInner() {
         {currentView === 'results' && (
           <ResultsView
             results={results}
-            onClear={() => setResults([])}
-            onBack={() => setCurrentView('select')}
+            onClear={() => {
+              setResults([]);
+              setErrorMessage(null);
+            }}
+            onBack={() => {
+              setErrorMessage(null);
+              setCurrentView('select');
+            }}
+            errorMessage={errorMessage}
           />
         )}
       </main>
@@ -220,7 +233,6 @@ function GeneratorPageInner() {
         <ProcessingOverlay
           progress={progress}
           cooldown={cooldown}
-          currentSummary={currentSummary}
           isPaused={isPaused}
           onPause={() => void handlePause()}
           onResume={() => void handleResume()}

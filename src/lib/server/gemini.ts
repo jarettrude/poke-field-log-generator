@@ -14,6 +14,46 @@ const BACKOFF_MAX_MS = 64000;
 const RATE_LIMIT_BASE_MS = 30000;
 const RATE_LIMIT_MAX_MS = 120000;
 
+// ---------------------------------------------------------------------------
+// Batch-level TTS quota tracking
+// ---------------------------------------------------------------------------
+// Within a single batch, once a model's daily quota is exhausted we skip it
+// for all remaining items. This avoids wasting API calls on a model we know
+// is maxed out. Each new batch should call resetBatchQuotaState().
+
+interface BatchQuotaState {
+  proExhausted: boolean;
+  flashExhausted: boolean;
+}
+
+const batchQuota: BatchQuotaState = {
+  proExhausted: false,
+  flashExhausted: false,
+};
+
+/**
+ * Reset batch quota state. Call at the start of every new batch.
+ */
+export function resetBatchQuotaState(): void {
+  batchQuota.proExhausted = false;
+  batchQuota.flashExhausted = false;
+}
+
+/**
+ * Custom error thrown when ALL TTS models have exhausted their daily quota.
+ * The jobRunner should catch this to stop the batch gracefully and show
+ * partial results + a user-friendly message.
+ */
+export class TtsQuotaExhaustedError extends Error {
+  constructor(message?: string) {
+    super(
+      message ||
+        'All TTS models have exceeded their daily API quota. Try again tomorrow after midnight Pacific Time.'
+    );
+    this.name = 'TtsQuotaExhaustedError';
+  }
+}
+
 /**
  * Check if error is a daily quota exhaustion (not recoverable by retrying).
  *
@@ -189,8 +229,17 @@ export async function generateSummary(details: PokemonDetails, region: string): 
  *
  * Budget: Pro has 50 RPD, Flash has 100 RPD. Every call counts.
  * The jobRunner does NOT add its own retry layer on top of this.
+ *
+ * Batch-level optimization: Once a model's daily quota is exhausted within
+ * a batch, it is skipped for all remaining items. If both models are
+ * exhausted, throws TtsQuotaExhaustedError so the batch can stop gracefully.
  */
 export async function generateTts(params: { text: string; voiceName: string }): Promise<string> {
+  // If both models are already known-exhausted, fail immediately
+  if (batchQuota.proExhausted && batchQuota.flashExhausted) {
+    throw new TtsQuotaExhaustedError();
+  }
+
   const ai = getClient();
   const instruction = await getActivePrompt('tts');
 
@@ -233,17 +282,44 @@ export async function generateTts(params: { text: string; voiceName: string }): 
     return inlineData.data;
   };
 
-  try {
-    console.log('Attempting TTS with gemini-2.5-pro-preview-tts...');
-    return await withRetry(() => makeTtsRequest('gemini-2.5-pro-preview-tts'), MAX_RETRIES_TTS);
-  } catch (proError) {
-    const reason = isDailyQuotaExhausted(proError)
-      ? 'daily quota exhausted - immediate fallback'
-      : 'exhausted all retries';
-    console.warn(
-      `gemini-2.5-pro-preview-tts failed (${reason}). Falling back to gemini-2.5-flash-preview-tts...`
-    );
-
-    return await withRetry(() => makeTtsRequest('gemini-2.5-flash-preview-tts'), MAX_RETRIES_TTS);
+  // Try Pro first (unless already exhausted for this batch)
+  if (!batchQuota.proExhausted) {
+    try {
+      console.log('Attempting TTS with gemini-2.5-pro-preview-tts...');
+      return await withRetry(() => makeTtsRequest('gemini-2.5-pro-preview-tts'), MAX_RETRIES_TTS);
+    } catch (proError) {
+      if (isDailyQuotaExhausted(proError)) {
+        batchQuota.proExhausted = true;
+        console.warn(
+          'gemini-2.5-pro-preview-tts daily quota exhausted. Skipping Pro for rest of batch.'
+        );
+      } else {
+        console.warn(
+          `gemini-2.5-pro-preview-tts failed (exhausted all retries). Falling back to Flash...`
+        );
+      }
+    }
+  } else {
+    console.log('Skipping Pro TTS (daily quota already exhausted this batch). Using Flash...');
   }
+
+  // Try Flash (unless already exhausted for this batch)
+  if (!batchQuota.flashExhausted) {
+    try {
+      return await withRetry(() => makeTtsRequest('gemini-2.5-flash-preview-tts'), MAX_RETRIES_TTS);
+    } catch (flashError) {
+      if (isDailyQuotaExhausted(flashError)) {
+        batchQuota.flashExhausted = true;
+        console.warn(
+          'gemini-2.5-flash-preview-tts daily quota exhausted. All TTS models exhausted.'
+        );
+      } else {
+        // Non-quota error on Flash — re-throw as-is
+        throw flashError;
+      }
+    }
+  }
+
+  // If we reach here, both models are exhausted
+  throw new TtsQuotaExhaustedError();
 }

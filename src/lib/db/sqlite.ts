@@ -534,12 +534,6 @@ export class SQLiteAdapter implements DatabaseAdapter {
     stmt.run(cooldownUntil, now, id);
   }
 
-  async setJobHeartbeat(id: string): Promise<void> {
-    const now = new Date().toISOString();
-    const stmt = this.db!.prepare('UPDATE jobs SET updated_at = ? WHERE id = ?');
-    stmt.run(now, id);
-  }
-
   async setJobError(id: string, error: string): Promise<void> {
     const now = new Date().toISOString();
     const stmt = this.db!.prepare(
