@@ -31,13 +31,15 @@ The Pokedex Field Log Generator creates authentic field researcher logs for Poke
 
 - Node.js 18 or higher
 - pnpm (recommended) or npm
-- Gemini API key (free tier available)
+- Gemini API key (paid key recommended for full features)
 
 ### Installation
 
 1. **Get a Gemini API Key**
    
-   Sign up at [Google AI Studio](https://aistudio.google.com/) to obtain your free API key.
+   Sign up at [Google AI Studio](https://aistudio.google.com/) to obtain your API key.
+   
+   **Important:** The default configuration uses `gemini-2.5-pro-preview-tts` which requires a **paid API key**. Free tier keys are limited to `gemini-2.5-flash-preview-tts` only (10 calls/day).
 
 2. **Clone the Repository**
    

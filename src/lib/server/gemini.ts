@@ -1,5 +1,11 @@
 /**
  * Server-side Gemini AI client for summary generation and text-to-speech.
+ * 
+ * Rate limits configured for PAID API keys:
+ * - Pro TTS: 50 RPD (requests per day)
+ * - Flash TTS: 100 RPD (paid) / 10 RPD (free tier)
+ * 
+ * Note: Free tier users will hit quota limits much faster
  */
 
 import { GoogleGenAI, Modality, Type } from '@google/genai';
@@ -227,7 +233,8 @@ export async function generateSummary(details: PokemonDetails, region: string): 
  * Daily quota exhaustion (RPD) triggers IMMEDIATE fallback (no retries).
  * Transient rate limits (RPM) retry with exponential backoff (30s base).
  *
- * Budget: Pro has 50 RPD, Flash has 100 RPD. Every call counts.
+ * Budget: Pro has 50 RPD (paid only), Flash has 100 RPD (paid) / 10 RPD (free tier). Every call counts.
+ * Free tier users will exhaust Flash quota after just 10 requests per day.
  * The jobRunner does NOT add its own retry layer on top of this.
  *
  * Batch-level optimization: Once a model's daily quota is exhausted within
