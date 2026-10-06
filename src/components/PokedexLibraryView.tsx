@@ -1,33 +1,33 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import Image from 'next/image';
+import JSZip from 'jszip';
 import {
-  Search,
-  Download,
+  Check,
   ChevronDown,
   ChevronUp,
+  Download,
   FileText,
-  Sparkles,
-  X,
-  Check,
   ImageIcon,
-  Trash2,
-  Play,
-  Pause,
   Loader2,
+  Pause,
   Pencil,
+  Play,
   Save,
+  Search,
+  Sparkles,
+  Trash2,
   Volume2,
+  X,
 } from 'lucide-react';
+import Image from 'next/image';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { VOICE_OPTIONS } from '../constants';
+import { mp3ToUrl, transcriptToCaptionUrl } from '../services/audioUtils';
 import {
-  StoredSummary,
-  AudioLogMetadata,
+  type AudioLogMetadata,
   getAudioLog,
+  type StoredSummary,
   saveSummary,
 } from '../services/storageService';
 import { formatPokemonId } from '../utils/pokemonUtils';
-import { mp3ToUrl } from '../services/audioUtils';
-import JSZip from 'jszip';
 
 interface PokedexEntry {
   id: number;
@@ -52,9 +52,10 @@ interface LazyAudioPlayerProps {
     audioFormat: 'mp3';
     bitrate: number;
   };
+  transcript?: string;
 }
 
-const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId }) => {
+const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId, transcript }) => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -114,9 +115,10 @@ const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId }) => {
   if (!audioUrl) {
     return (
       <button
+        type="button"
         onClick={loadAndPlay}
         disabled={isLoading}
-        className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all hover:opacity-80 disabled:opacity-50"
+        className="flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-sm transition-all hover:opacity-80 disabled:opacity-50"
         style={{ background: 'var(--accent-secondary)', color: 'var(--text-inverse)' }}
       >
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
@@ -128,6 +130,7 @@ const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId }) => {
   return (
     <div className="flex items-center gap-2">
       <button
+        type="button"
         onClick={togglePlay}
         className="flex h-8 w-8 items-center justify-center rounded-full transition-all hover:opacity-80"
         style={{ background: 'var(--accent-secondary)', color: 'var(--text-inverse)' }}
@@ -142,7 +145,15 @@ const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId }) => {
         onEnded={() => setIsPlaying(false)}
         className="h-8 flex-1"
         controls
-      />
+      >
+        <track
+          kind="captions"
+          src={transcriptToCaptionUrl(transcript)}
+          srcLang="en"
+          label="Transcript"
+          default
+        />
+      </audio>
     </div>
   );
 };
@@ -185,7 +196,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
     'all' | 'text' | 'audio' | 'complete' | 'text-only' | 'audio-only'
   >('all');
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [manualSelectedIds, setManualSelectedIds] = useState<Set<number>>(new Set());
   const [selectionMode, setSelectionMode] = useState<
     'manual' | 'range' | 'generation' | 'region' | 'has-text' | 'has-audio'
   >('manual');
@@ -198,9 +209,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   const [savingSummaryIds, setSavingSummaryIds] = useState<Set<number>>(new Set());
 
   const getIdBounds = useCallback((ids: number[]) => {
-    if (ids.length === 0) return null;
-    let min = ids[0]!;
-    let max = ids[0]!;
+    const first = ids[0];
+    if (first === undefined) return null;
+    let min = first;
+    let max = first;
     for (const id of ids) {
       if (id < min) min = id;
       if (id > max) max = id;
@@ -405,18 +417,16 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   };
 
   const toggleSelect = (id: number) => {
-    if (selectionMode !== 'manual') {
-      setSelectionMode('manual');
+    // Switching to manual mode carries the current auto-derived selection over
+    // as the starting point for manual edits.
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
     }
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setSelectionMode('manual');
+    setManualSelectedIds(next);
   };
 
   const computeSelectionForMode = useCallback(
@@ -490,64 +500,64 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
     [filteredEntries, generationFilter, rangeEnd, rangeStart, regionFilter]
   );
 
-  const handleSelectionModeChange = (mode: typeof selectionMode) => {
-    setSelectionMode(mode);
-
-    if (mode === 'manual') {
-      return;
+  // In auto modes the selection is derived from the current filters and range
+  // inputs; in 'manual' mode it comes from the user's per-entry toggles.
+  const selectedIds = useMemo<Set<number>>(() => {
+    if (selectionMode === 'manual') {
+      return manualSelectedIds;
     }
-
-    if (mode === 'range') {
-      const bounds = filteredIdBounds;
-      if (bounds) {
-        setRangeStart(bounds.min);
-        setRangeEnd(bounds.max);
-        setSelectedIds(computeSelectionForMode('range', { start: bounds.min, end: bounds.max }));
-        return;
-      }
-    }
-
-    setSelectedIds(computeSelectionForMode(mode));
-  };
-
-  useEffect(() => {
-    if (selectionMode === 'manual') return;
 
     if (selectionMode === 'range') {
       if (!filteredIdBounds) {
-        setSelectedIds(new Set());
-        return;
+        return new Set();
       }
-
-      const low = Math.min(rangeStart, rangeEnd);
-      const high = Math.max(rangeStart, rangeEnd);
-      const nextStart = Math.max(filteredIdBounds.min, low);
-      const nextEnd = Math.min(filteredIdBounds.max, high);
-
-      if (nextStart !== low || nextEnd !== high) {
-        setRangeStart(nextStart);
-        setRangeEnd(nextEnd);
-        setSelectedIds(computeSelectionForMode('range', { start: nextStart, end: nextEnd }));
-        return;
-      }
-
-      setSelectedIds(computeSelectionForMode('range'));
-      return;
+      const low = Math.max(filteredIdBounds.min, Math.min(rangeStart, rangeEnd));
+      const high = Math.min(filteredIdBounds.max, Math.max(rangeStart, rangeEnd));
+      return computeSelectionForMode('range', { start: low, end: high });
     }
 
-    setSelectedIds(computeSelectionForMode(selectionMode));
+    return computeSelectionForMode(selectionMode);
   }, [
-    computeSelectionForMode,
-    contentFilter,
-    filteredEntries.length,
-    filteredIdBounds,
-    generationFilter,
-    rangeEnd,
-    rangeStart,
-    regionFilter,
-    searchQuery,
     selectionMode,
+    manualSelectedIds,
+    filteredIdBounds,
+    rangeStart,
+    rangeEnd,
+    computeSelectionForMode,
   ]);
+
+  // Keep the range inputs normalized (ordered and clamped to the filtered
+  // bounds) when the bounds or inputs change. This adjusts state during
+  // render, which React guarantees re-renders immediately before commit.
+  const [prevRangeInputs, setPrevRangeInputs] = useState({
+    bounds: filteredIdBounds,
+    start: rangeStart,
+    end: rangeEnd,
+  });
+  if (
+    selectionMode === 'range' &&
+    filteredIdBounds &&
+    (filteredIdBounds !== prevRangeInputs.bounds ||
+      rangeStart !== prevRangeInputs.start ||
+      rangeEnd !== prevRangeInputs.end)
+  ) {
+    const nextStart = Math.max(filteredIdBounds.min, Math.min(rangeStart, rangeEnd));
+    const nextEnd = Math.min(filteredIdBounds.max, Math.max(rangeStart, rangeEnd));
+    setPrevRangeInputs({ bounds: filteredIdBounds, start: nextStart, end: nextEnd });
+    if (nextStart !== rangeStart || nextEnd !== rangeEnd) {
+      setRangeStart(nextStart);
+      setRangeEnd(nextEnd);
+    }
+  }
+
+  const handleSelectionModeChange = (mode: typeof selectionMode) => {
+    setSelectionMode(mode);
+
+    if (mode === 'range' && filteredIdBounds) {
+      setRangeStart(filteredIdBounds.min);
+      setRangeEnd(filteredIdBounds.max);
+    }
+  };
 
   const handleDownload = async () => {
     if (selectedIds.size === 0) {
@@ -639,7 +649,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
     setIsDeleting(true);
     try {
       await onDeleteSummaries(Array.from(selectedIds) as number[]);
-      setSelectedIds(new Set());
+      setManualSelectedIds(new Set());
       onRefresh();
     } catch (e) {
       console.error('Failed to delete summaries:', e);
@@ -656,7 +666,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
     setIsDeleting(true);
     try {
       await onDeleteAudio(Array.from(selectedIds) as number[]);
-      setSelectedIds(new Set());
+      setManualSelectedIds(new Set());
       onRefresh();
     } catch (e) {
       console.error('Failed to delete audio:', e);
@@ -674,7 +684,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
     try {
       const ids = Array.from(selectedIds) as number[];
       await Promise.all([onDeleteSummaries(ids), onDeleteAudio(ids)]);
-      setSelectedIds(new Set());
+      setManualSelectedIds(new Set());
       onRefresh();
     } catch (e) {
       console.error('Failed to delete:', e);
@@ -689,7 +699,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
       {/* Header */}
       <div className="mb-4">
         <div className="mb-3">
-          <h1 className="text-xl font-bold sm:text-2xl" style={{ color: 'var(--text-primary)' }}>
+          <h1 className="font-bold text-xl sm:text-2xl" style={{ color: 'var(--text-primary)' }}>
             Pokédex Library
           </h1>
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -705,6 +715,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-2">
             {onDeleteSummaries && (
               <button
+                type="button"
                 onClick={handleDeleteSummaries}
                 disabled={isDeleting}
                 className="btn btn-outline py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
@@ -716,6 +727,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
             )}
             {onDeleteAudio && (
               <button
+                type="button"
                 onClick={handleDeleteAudio}
                 disabled={isDeleting}
                 className="btn btn-outline py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
@@ -727,6 +739,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
             )}
             {onDeleteSummaries && onDeleteAudio && (
               <button
+                type="button"
                 onClick={handleDeleteBoth}
                 disabled={isDeleting}
                 className="btn btn-outline py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
@@ -737,6 +750,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
               </button>
             )}
             <button
+              type="button"
               onClick={handleDownload}
               disabled={selectedIds.size === 0}
               className="btn btn-primary py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
@@ -773,9 +787,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                 </select>
               )}
               <button
+                type="button"
                 onClick={() => onGenerateAudio(selectedWithText.map(e => e.id))}
                 disabled={isGenerating || isDeleting}
-                className="btn py-2 text-xs whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-50"
+                className="btn whitespace-nowrap py-2 text-xs disabled:cursor-not-allowed disabled:opacity-50"
                 style={{
                   background: 'var(--accent-secondary)',
                   color: 'var(--text-inverse)',
@@ -859,9 +874,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
             ] as const
           ).map(({ key, label }) => (
             <button
+              type="button"
               key={key}
               onClick={() => setContentFilter(key)}
-              className="rounded-md px-2 py-1 text-xs font-semibold transition-all"
+              className="rounded-md px-2 py-1 font-semibold text-xs transition-all"
               style={
                 contentFilter === key
                   ? {
@@ -882,7 +898,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         <div className="h-6 w-px" style={{ background: 'var(--border-secondary)' }} />
 
         {/* Selection Mode */}
-        <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
+        <span className="font-semibold text-xs" style={{ color: 'var(--text-secondary)' }}>
           Select:
         </span>
         {[
@@ -894,9 +910,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           { mode: 'has-audio' as const, label: 'Has Audio' },
         ].map(({ mode, label }) => (
           <button
+            type="button"
             key={mode}
             onClick={() => handleSelectionModeChange(mode)}
-            className="rounded-lg px-3 py-1 text-xs font-semibold transition-all"
+            className="rounded-lg px-3 py-1 font-semibold text-xs transition-all"
             style={
               selectionMode === mode
                 ? {
@@ -939,12 +956,12 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
               ({filteredIdBounds.min}–{filteredIdBounds.max})
             </span>
             <button
+              type="button"
               onClick={() => {
                 const low = Math.max(filteredIdBounds.min, Math.min(rangeStart, rangeEnd));
                 const high = Math.min(filteredIdBounds.max, Math.max(rangeStart, rangeEnd));
                 setRangeStart(low);
                 setRangeEnd(high);
-                setSelectedIds(computeSelectionForMode('range', { start: low, end: high }));
               }}
               className="btn btn-secondary px-2 py-1 text-xs"
             >
@@ -956,11 +973,12 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         {/* Clear Selection */}
         {selectedIds.size > 0 && (
           <button
+            type="button"
             onClick={() => {
               setSelectionMode('manual');
-              setSelectedIds(new Set());
+              setManualSelectedIds(new Set());
             }}
-            className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all"
+            className="ml-auto flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-xs transition-all"
             style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
           >
             <X className="h-3 w-3" />
@@ -990,6 +1008,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
               }}
             >
               <button
+                type="button"
                 onClick={() => toggleSelect(entry.id)}
                 className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all"
                 style={{
@@ -1004,14 +1023,14 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
               <div className="relative h-48 p-6" style={{ background: 'var(--bg-secondary)' }}>
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
                   <span
-                    className="rounded-full px-3 py-1 text-xs font-bold"
+                    className="rounded-full px-3 py-1 font-bold text-xs"
                     style={{ background: 'var(--accent-primary)', color: 'var(--text-inverse)' }}
                   >
                     #{formatPokemonId(entry.id)}
                   </span>
                   {hasText && (
                     <span
-                      className="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold"
+                      className="flex items-center gap-1 rounded-full px-2 py-1 font-bold text-xs"
                       style={{
                         background: 'var(--accent-secondary)',
                         color: 'var(--text-inverse)',
@@ -1023,7 +1042,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                   )}
                   {hasAudio && (
                     <span
-                      className="flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold"
+                      className="flex items-center gap-1 rounded-full px-2 py-1 font-bold text-xs"
                       style={{ background: '#d97706', color: 'var(--text-inverse)' }}
                     >
                       <Volume2 className="h-3 w-3" />
@@ -1053,7 +1072,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
 
               <div className="p-5" style={{ background: 'var(--surface-card)' }}>
                 <h3
-                  className="mb-1 text-xl font-bold capitalize"
+                  className="mb-1 font-bold text-xl capitalize"
                   style={{ color: 'var(--text-primary)' }}
                 >
                   {entry.name}
@@ -1066,15 +1085,16 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                   <div className="mb-3">
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <span
-                        className="text-xs font-semibold"
+                        className="font-semibold text-xs"
                         style={{ color: 'var(--text-tertiary)' }}
                       >
                         Script
                       </span>
                       {!isEditingSummary ? (
                         <button
+                          type="button"
                           onClick={() => startEditingSummary(entry)}
-                          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:opacity-80"
+                          className="flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-xs transition-all hover:opacity-80"
                           style={{
                             background: 'var(--bg-secondary)',
                             color: 'var(--text-secondary)',
@@ -1086,9 +1106,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                       ) : (
                         <div className="flex items-center gap-2">
                           <button
+                            type="button"
                             onClick={() => void saveEditedSummary(entry)}
                             disabled={isSavingSummary}
-                            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:opacity-80 disabled:opacity-50"
+                            className="flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-xs transition-all hover:opacity-80 disabled:opacity-50"
                             style={{
                               background: 'var(--accent-secondary)',
                               color: 'var(--text-inverse)',
@@ -1102,9 +1123,10 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                             Save
                           </button>
                           <button
+                            type="button"
                             onClick={cancelEditingSummary}
                             disabled={isSavingSummary}
-                            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:opacity-80 disabled:opacity-50"
+                            className="flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-xs transition-all hover:opacity-80 disabled:opacity-50"
                             style={{
                               background: 'var(--bg-secondary)',
                               color: 'var(--text-secondary)',
@@ -1133,8 +1155,9 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                       />
                     )}
                     <button
+                      type="button"
                       onClick={() => toggleExpand(entry.id)}
-                      className="mt-2 flex items-center gap-1 text-xs font-semibold transition-colors"
+                      className="mt-2 flex items-center gap-1 font-semibold text-xs transition-colors"
                       style={{ color: 'var(--accent-secondary)' }}
                     >
                       {isExpanded ? (
@@ -1152,7 +1175,11 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
 
                 {hasAudio && entry.audioMeta && (
                   <div className="mt-3">
-                    <LazyAudioPlayer pokemonId={entry.id} audioMeta={entry.audioMeta} />
+                    <LazyAudioPlayer
+                      pokemonId={entry.id}
+                      audioMeta={entry.audioMeta}
+                      transcript={entry.summary}
+                    />
                   </div>
                 )}
 
@@ -1182,7 +1209,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           style={{ background: 'var(--surface-card)', borderColor: 'var(--border-primary)' }}
         >
           <Search className="mx-auto mb-4 h-16 w-16" style={{ color: 'var(--text-tertiary)' }} />
-          <p className="text-xl font-semibold" style={{ color: 'var(--text-secondary)' }}>
+          <p className="font-semibold text-xl" style={{ color: 'var(--text-secondary)' }}>
             No entries found
           </p>
           <p className="mt-2 text-sm" style={{ color: 'var(--text-tertiary)' }}>

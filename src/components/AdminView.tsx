@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Pencil, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Pencil } from 'lucide-react';
+import type React from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  setPromptOverride,
+  cancelAllRunningJobs,
+  pauseAllRunningJobs,
+  recoverStalledJobs,
+} from '../services/jobsService';
+import {
   clearPromptOverride,
   getAllPrompts,
-  getDefaultPrompt,
-  PromptConfig,
+  type PromptConfig,
+  setPromptOverride,
 } from '../services/promptService';
-import {
-  recoverStalledJobs,
-  pauseAllRunningJobs,
-  cancelAllRunningJobs,
-} from '../services/jobsService';
 import { useToast } from './ToastProvider';
 
 export const AdminView: React.FC = () => {
@@ -32,28 +32,30 @@ export const AdminView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'summary' | 'tts'>('summary');
   const [editValue, setEditValue] = useState('');
 
-  useEffect(() => {
-    loadPrompts();
-  }, []);
-
-  useEffect(() => {
-    setEditValue(prompts.current[activeTab]);
-  }, [activeTab, prompts]);
-
-  const loadPrompts = async () => {
+  const loadPrompts = useCallback(async (tab: 'summary' | 'tts') => {
     try {
       const allPrompts = await getAllPrompts();
       setPrompts(allPrompts);
+      setEditValue(allPrompts.current[tab]);
     } catch (error) {
       console.error('Failed to load prompts:', error);
     }
+  }, []);
+
+  useEffect(() => {
+    void loadPrompts('summary');
+  }, [loadPrompts]);
+
+  const handleTabChange = (tab: 'summary' | 'tts') => {
+    setActiveTab(tab);
+    setEditValue(prompts.current[tab]);
   };
 
   const handleSave = async () => {
     setLoading(true);
     try {
       await setPromptOverride(activeTab, editValue);
-      await loadPrompts();
+      await loadPrompts(activeTab);
       showToast({
         variant: 'success',
         title: 'Prompt saved',
@@ -75,8 +77,7 @@ export const AdminView: React.FC = () => {
     setLoading(true);
     try {
       await clearPromptOverride(activeTab);
-      await loadPrompts();
-      setEditValue(getDefaultPrompt(activeTab));
+      await loadPrompts(activeTab);
       showToast({
         variant: 'success',
         title: 'Prompt reset',
@@ -168,7 +169,7 @@ export const AdminView: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
-      <h2 className="mb-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+      <h2 className="mb-2 font-bold text-2xl" style={{ color: 'var(--text-primary)' }}>
         Prompt Settings
       </h2>
       <p className="mb-8 text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -177,7 +178,8 @@ export const AdminView: React.FC = () => {
 
       <div className="mb-6 flex gap-2">
         <button
-          onClick={() => setActiveTab('summary')}
+          type="button"
+          onClick={() => handleTabChange('summary')}
           className={activeTab === 'summary' ? 'btn btn-primary' : 'btn btn-outline'}
         >
           Summary Prompt
@@ -186,7 +188,8 @@ export const AdminView: React.FC = () => {
           )}
         </button>
         <button
-          onClick={() => setActiveTab('tts')}
+          type="button"
+          onClick={() => handleTabChange('tts')}
           className={activeTab === 'tts' ? 'btn btn-primary' : 'btn btn-outline'}
         >
           TTS Prompt
@@ -209,7 +212,7 @@ export const AdminView: React.FC = () => {
           style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}
         >
           <span
-            className="flex items-center gap-2 text-xs font-medium"
+            className="flex items-center gap-2 font-medium text-xs"
             style={{ color: 'var(--text-tertiary)' }}
           >
             {prompts.hasOverrides[activeTab] ? (
@@ -222,6 +225,7 @@ export const AdminView: React.FC = () => {
           </span>
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={handleReset}
               disabled={loading}
               className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
@@ -229,6 +233,7 @@ export const AdminView: React.FC = () => {
               {loading ? 'Resetting...' : 'Reset to Default'}
             </button>
             <button
+              type="button"
               onClick={handleSave}
               disabled={loading}
               className="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
@@ -238,7 +243,7 @@ export const AdminView: React.FC = () => {
           </div>
         </div>
       </div>
-      <h2 className="mt-8 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+      <h2 className="mt-8 font-bold text-2xl" style={{ color: 'var(--text-primary)' }}>
         Job Maintenance
       </h2>
       <p className="mb-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -247,6 +252,7 @@ export const AdminView: React.FC = () => {
       <div className="card-elevated mb-10 overflow-hidden">
         <div className="flex flex-col gap-3 p-6">
           <button
+            type="button"
             onClick={handleRecoverStalled}
             disabled={maintenanceLoading !== null}
             className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
@@ -254,6 +260,7 @@ export const AdminView: React.FC = () => {
             {maintenanceLoading === 'recover' ? 'Recovering...' : 'Recover Stalled Jobs'}
           </button>
           <button
+            type="button"
             onClick={handlePauseAll}
             disabled={maintenanceLoading !== null}
             className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
@@ -261,6 +268,7 @@ export const AdminView: React.FC = () => {
             {maintenanceLoading === 'pauseAll' ? 'Pausing...' : 'Pause All Running Jobs'}
           </button>
           <button
+            type="button"
             onClick={handleCancelAll}
             disabled={maintenanceLoading !== null}
             className="btn btn-outline disabled:cursor-not-allowed disabled:opacity-50"
