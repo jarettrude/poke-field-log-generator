@@ -75,10 +75,12 @@ class JobEventEmitter {
    * Returns an unsubscribe function.
    */
   subscribe(jobId: string, listener: JobEventListener): () => void {
-    if (!this.listeners.has(jobId)) {
-      this.listeners.set(jobId, new Set());
+    let set = this.listeners.get(jobId);
+    if (!set) {
+      set = new Set();
+      this.listeners.set(jobId, set);
     }
-    this.listeners.get(jobId)!.add(listener);
+    set.add(listener);
 
     return () => {
       const set = this.listeners.get(jobId);

@@ -3,7 +3,8 @@
  * Fetches from PokeAPI and caches to SQLite via backend
  */
 
-import { PokemonBaseInfo, PokemonDetails, VariantCategory } from '../types';
+import type { PokemonBaseInfo, PokemonDetails, VariantCategory } from '../types';
+import { extractIdFromUrl } from '../utils/pokemonUtils';
 
 const BASE_URL = 'https://pokeapi.co/api/v2';
 const API_BASE = '/api';
@@ -153,13 +154,13 @@ export function formatDisplayName(
   if (!formName || category === 'default') return capitalizedBase;
 
   if (category === 'regional' && regionName) {
-    const adjective = regionName.endsWith('a') ? regionName.slice(0, -1) + 'n' : regionName + 'ian';
+    const adjective = regionName.endsWith('a') ? `${regionName.slice(0, -1)}n` : `${regionName}ian`;
     return `${adjective} ${capitalizedBase}`;
   }
 
   if (category === 'mega') {
     const suffix = formName.replace('mega', '').replace(/-/g, ' ').trim().toUpperCase();
-    return `Mega ${capitalizedBase}${suffix ? ' ' + suffix : ''}`;
+    return `Mega ${capitalizedBase}${suffix ? ` ${suffix}` : ''}`;
   }
 
   if (category === 'gmax') return `Gigantamax ${capitalizedBase}`;
@@ -215,7 +216,7 @@ export const fetchPokemonInGeneration = async (genId: number): Promise<PokemonBa
 
   const pokemonList = data.pokemon_species
     .map((p: { name: string; url: string }) => {
-      const id = parseInt(p.url.split('/').filter(Boolean).pop()!);
+      const id = extractIdFromUrl(p.url);
       const name = p.name;
       return {
         id,
@@ -251,7 +252,7 @@ export async function fetchVariantsForGeneration(genId: number): Promise<Pokemon
     for (const variety of speciesData.varieties) {
       if (variety.is_default) continue; // Skip base forms
 
-      const variantId = parseInt(variety.pokemon.url.split('/').filter(Boolean).pop()!);
+      const variantId = extractIdFromUrl(variety.pokemon.url);
       const variantName = variety.pokemon.name;
       const formName = variantName.replace(`${speciesData.name}-`, '') || null;
 
@@ -441,7 +442,7 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
       pokemonData.sprites.other?.home?.front_default ??
       pokemonData.sprites.front_default);
 
-  const generationId = parseInt(speciesData.generation.url.split('/').filter(Boolean).pop()!, 10);
+  const generationId = extractIdFromUrl(speciesData.generation.url);
 
   const generationRes = await fetch(speciesData.generation.url);
   let region = 'Unknown';
@@ -452,9 +453,7 @@ export const fetchPokemonDetails = async (id: number): Promise<PokemonDetails> =
 
   const speciesId = speciesData.id;
   const isDefault =
-    speciesData.varieties.find(
-      v => parseInt(v.pokemon.url.split('/').filter(Boolean).pop()!) === id
-    )?.is_default ?? true;
+    speciesData.varieties.find(v => extractIdFromUrl(v.pokemon.url) === id)?.is_default ?? true;
 
   let formName: string | null = null;
   let isMega = false;

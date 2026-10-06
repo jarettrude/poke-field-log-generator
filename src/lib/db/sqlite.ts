@@ -3,23 +3,23 @@
  * Uses better-sqlite3 for local persistent storage
  */
 
+import path from 'node:path';
 import Database from 'better-sqlite3';
-import path from 'path';
-import {
-  DatabaseAdapter,
-  ProcessingJob,
-  CreateJobInput,
-  JobStatus,
-  ProcessingStage,
-  StoredSummary,
-  StoredAudioLog,
+import type {
+  AudioLogInput,
   AudioLogMetadata,
   CachedPokemon,
-  SummaryInput,
-  AudioLogInput,
+  CreateJobInput,
+  DatabaseAdapter,
+  JobStatus,
   PokemonInput,
-  StoredPrompt,
+  ProcessingJob,
+  ProcessingStage,
   PromptInput,
+  StoredAudioLog,
+  StoredPrompt,
+  StoredSummary,
+  SummaryInput,
 } from './adapter';
 
 interface DatabaseRow {
@@ -27,8 +27,15 @@ interface DatabaseRow {
 }
 
 export class SQLiteAdapter implements DatabaseAdapter {
-  private db: Database.Database | null = null;
+  private _db: Database.Database | null = null;
   private dbPath: string;
+
+  private get db(): Database.Database {
+    if (!this._db) {
+      throw new Error('Database not initialized. Call initialize() first.');
+    }
+    return this._db;
+  }
 
   constructor(dbPath?: string) {
     // Store in data directory by default (works with Docker volume mounts)
@@ -36,7 +43,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async initialize(): Promise<void> {
-    this.db = new Database(this.dbPath);
+    this._db = new Database(this.dbPath);
 
     // Enable WAL mode for better performance
     this.db.pragma('journal_mode = WAL');
@@ -234,7 +241,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   async saveSummary(summary: SummaryInput): Promise<void> {
     const now = new Date().toISOString();
 
-    const stmt = this.db!.prepare(`
+    const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO summaries (id, name, summary, region, generation_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM summaries WHERE id = ?), ?), ?)
     `);
@@ -252,7 +259,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getSummary(id: number): Promise<StoredSummary | null> {
-    const stmt = this.db!.prepare('SELECT * FROM summaries WHERE id = ?');
+    const stmt = this.db.prepare('SELECT * FROM summaries WHERE id = ?');
     const row = stmt.get(id) as DatabaseRow | undefined;
 
     if (!row) return null;
@@ -261,21 +268,21 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getAllSummaries(): Promise<StoredSummary[]> {
-    const stmt = this.db!.prepare('SELECT * FROM summaries ORDER BY id');
+    const stmt = this.db.prepare('SELECT * FROM summaries ORDER BY id');
     const rows = stmt.all() as DatabaseRow[];
 
     return rows.map(this.mapRowToSummary);
   }
 
   async getSummariesByGeneration(genId: number): Promise<StoredSummary[]> {
-    const stmt = this.db!.prepare('SELECT * FROM summaries WHERE generation_id = ? ORDER BY id');
+    const stmt = this.db.prepare('SELECT * FROM summaries WHERE generation_id = ? ORDER BY id');
     const rows = stmt.all(genId) as DatabaseRow[];
 
     return rows.map(this.mapRowToSummary);
   }
 
   async deleteSummary(id: number): Promise<void> {
-    const stmt = this.db!.prepare('DELETE FROM summaries WHERE id = ?');
+    const stmt = this.db.prepare('DELETE FROM summaries WHERE id = ?');
     stmt.run(id);
   }
 
@@ -283,7 +290,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   async saveAudioLog(audioLog: AudioLogInput): Promise<void> {
     const now = new Date().toISOString();
 
-    const stmt = this.db!.prepare(`
+    const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO audio_logs
       (id, name, region, generation_id, voice, audio_base64, audio_format, bitrate, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM audio_logs WHERE id = ?), ?), ?)
@@ -305,7 +312,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getAudioLog(id: number): Promise<StoredAudioLog | null> {
-    const stmt = this.db!.prepare('SELECT * FROM audio_logs WHERE id = ?');
+    const stmt = this.db.prepare('SELECT * FROM audio_logs WHERE id = ?');
     const row = stmt.get(id) as DatabaseRow | undefined;
 
     if (!row) return null;
@@ -314,13 +321,13 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getAllAudioLogs(): Promise<StoredAudioLog[]> {
-    const stmt = this.db!.prepare('SELECT * FROM audio_logs ORDER BY id');
+    const stmt = this.db.prepare('SELECT * FROM audio_logs ORDER BY id');
     const rows = stmt.all() as DatabaseRow[];
     return rows.map(this.mapRowToAudioLog);
   }
 
   async getAllAudioLogsMetadata(): Promise<AudioLogMetadata[]> {
-    const stmt = this.db!.prepare(
+    const stmt = this.db.prepare(
       'SELECT id, name, region, generation_id, voice, audio_format, bitrate, created_at, updated_at FROM audio_logs ORDER BY id'
     );
     const rows = stmt.all() as DatabaseRow[];
@@ -328,13 +335,13 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getAudioLogsByGeneration(genId: number): Promise<StoredAudioLog[]> {
-    const stmt = this.db!.prepare('SELECT * FROM audio_logs WHERE generation_id = ? ORDER BY id');
+    const stmt = this.db.prepare('SELECT * FROM audio_logs WHERE generation_id = ? ORDER BY id');
     const rows = stmt.all(genId) as DatabaseRow[];
     return rows.map(this.mapRowToAudioLog);
   }
 
   async getAudioLogsMetadataByGeneration(genId: number): Promise<AudioLogMetadata[]> {
-    const stmt = this.db!.prepare(
+    const stmt = this.db.prepare(
       'SELECT id, name, region, generation_id, voice, audio_format, bitrate, created_at, updated_at FROM audio_logs WHERE generation_id = ? ORDER BY id'
     );
     const rows = stmt.all(genId) as DatabaseRow[];
@@ -342,14 +349,14 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async deleteAudioLog(id: number): Promise<void> {
-    const stmt = this.db!.prepare('DELETE FROM audio_logs WHERE id = ?');
+    const stmt = this.db.prepare('DELETE FROM audio_logs WHERE id = ?');
     stmt.run(id);
   }
 
   async cachePokemon(pokemon: PokemonInput): Promise<void> {
     const now = new Date().toISOString();
 
-    const stmt = this.db!.prepare(`
+    const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO pokemon_cache 
       (id, name, display_name, height, weight, types, habitat, flavor_texts, move_names, 
        image_png_path, image_svg_path, generation_id, region, species_id, is_default, 
@@ -381,7 +388,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getCachedPokemon(id: number): Promise<CachedPokemon | null> {
-    const stmt = this.db!.prepare('SELECT * FROM pokemon_cache WHERE id = ?');
+    const stmt = this.db.prepare('SELECT * FROM pokemon_cache WHERE id = ?');
     const row = stmt.get(id) as DatabaseRow | undefined;
 
     if (!row) return null;
@@ -390,7 +397,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getAllCachedPokemon(): Promise<CachedPokemon[]> {
-    const stmt = this.db!.prepare('SELECT * FROM pokemon_cache ORDER BY id');
+    const stmt = this.db.prepare('SELECT * FROM pokemon_cache ORDER BY id');
     const rows = stmt.all() as DatabaseRow[];
 
     return rows.map(this.mapRowToPokemon);
@@ -400,7 +407,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   async savePrompt(prompt: PromptInput): Promise<void> {
     const now = new Date().toISOString();
 
-    const stmt = this.db!.prepare(`
+    const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO prompts (type, content, created_at, updated_at)
       VALUES (?, ?, COALESCE((SELECT created_at FROM prompts WHERE type = ?), ?), ?)
     `);
@@ -409,7 +416,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getPrompt(type: string): Promise<StoredPrompt | null> {
-    const stmt = this.db!.prepare('SELECT * FROM prompts WHERE type = ?');
+    const stmt = this.db.prepare('SELECT * FROM prompts WHERE type = ?');
     const row = stmt.get(type) as DatabaseRow | undefined;
 
     if (!row) return null;
@@ -418,14 +425,14 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getAllPrompts(): Promise<StoredPrompt[]> {
-    const stmt = this.db!.prepare('SELECT * FROM prompts ORDER BY type');
+    const stmt = this.db.prepare('SELECT * FROM prompts ORDER BY type');
     const rows = stmt.all() as DatabaseRow[];
 
     return rows.map(this.mapRowToPrompt);
   }
 
   async deletePrompt(type: string): Promise<void> {
-    const stmt = this.db!.prepare('DELETE FROM prompts WHERE type = ?');
+    const stmt = this.db.prepare('DELETE FROM prompts WHERE type = ?');
     stmt.run(type);
   }
 
@@ -433,7 +440,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   async createJob(input: CreateJobInput): Promise<void> {
     const now = new Date().toISOString();
     const initialStage: ProcessingStage = input.mode === 'AUDIO_ONLY' ? 'audio' : 'summary';
-    const stmt = this.db!.prepare(`
+    const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO jobs
       (id, status, stage, mode, generation_id, region, voice, total, current, message, cooldown_until, error, retry_count, pokemon_ids, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -460,7 +467,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getJob(id: string): Promise<ProcessingJob | null> {
-    const stmt = this.db!.prepare('SELECT * FROM jobs WHERE id = ?');
+    const stmt = this.db.prepare('SELECT * FROM jobs WHERE id = ?');
     const row = stmt.get(id) as DatabaseRow | undefined;
     if (!row) return null;
     return this.mapRowToJob(row);
@@ -471,17 +478,17 @@ export class SQLiteAdapter implements DatabaseAdapter {
   ): Promise<{ job: ProcessingJob; pokemonIds: number[] } | null> {
     const now = new Date().toISOString();
 
-    const claim = this.db!.transaction(() => {
+    const claim = this.db.transaction(() => {
       let row: DatabaseRow | undefined;
 
       if (allowedStages && allowedStages.length > 0) {
         const placeholders = allowedStages.map(() => '?').join(', ');
-        const stmt = this.db!.prepare(
+        const stmt = this.db.prepare(
           `SELECT * FROM jobs WHERE status = ? AND stage IN (${placeholders}) ORDER BY created_at ASC LIMIT 1`
         );
         row = stmt.get('queued', ...allowedStages) as DatabaseRow | undefined;
       } else {
-        const stmt = this.db!.prepare(
+        const stmt = this.db.prepare(
           'SELECT * FROM jobs WHERE status = ? ORDER BY created_at ASC LIMIT 1'
         );
         row = stmt.get('queued') as DatabaseRow | undefined;
@@ -489,12 +496,12 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
       if (!row) return null;
 
-      const update = this.db!.prepare(
+      const update = this.db.prepare(
         'UPDATE jobs SET status = ?, cooldown_until = NULL, updated_at = ? WHERE id = ?'
       );
       update.run('running', now, row.id);
 
-      const refreshed = this.db!.prepare('SELECT * FROM jobs WHERE id = ?').get(row.id) as
+      const refreshed = this.db.prepare('SELECT * FROM jobs WHERE id = ?').get(row.id) as
         | DatabaseRow
         | undefined;
       if (!refreshed) return null;
@@ -508,7 +515,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
   async setJobStatus(id: string, status: JobStatus): Promise<void> {
     const now = new Date().toISOString();
-    const stmt = this.db!.prepare('UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?');
+    const stmt = this.db.prepare('UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?');
     stmt.run(status, now, id);
   }
 
@@ -520,7 +527,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
     message: string
   ): Promise<void> {
     const now = new Date().toISOString();
-    const stmt = this.db!.prepare(
+    const stmt = this.db.prepare(
       'UPDATE jobs SET stage = ?, current = ?, total = ?, message = ?, updated_at = ? WHERE id = ?'
     );
     stmt.run(stage, current, total, message, now, id);
@@ -528,15 +535,13 @@ export class SQLiteAdapter implements DatabaseAdapter {
 
   async setJobCooldownUntil(id: string, cooldownUntil: string | null): Promise<void> {
     const now = new Date().toISOString();
-    const stmt = this.db!.prepare(
-      'UPDATE jobs SET cooldown_until = ?, updated_at = ? WHERE id = ?'
-    );
+    const stmt = this.db.prepare('UPDATE jobs SET cooldown_until = ?, updated_at = ? WHERE id = ?');
     stmt.run(cooldownUntil, now, id);
   }
 
   async setJobError(id: string, error: string): Promise<void> {
     const now = new Date().toISOString();
-    const stmt = this.db!.prepare(
+    const stmt = this.db.prepare(
       'UPDATE jobs SET status = ?, error = ?, updated_at = ? WHERE id = ?'
     );
     stmt.run('failed', error, now, id);
@@ -553,10 +558,12 @@ export class SQLiteAdapter implements DatabaseAdapter {
     total: number
   ): Promise<void> {
     const now = new Date().toISOString();
-    const txn = this.db!.transaction(() => {
-      this.db!.prepare(
-        'UPDATE jobs SET status = ?, stage = ?, current = ?, total = ?, message = ?, cooldown_until = NULL, updated_at = ? WHERE id = ?'
-      ).run('canceled', stage, current, total, 'Canceled', now, id);
+    const txn = this.db.transaction(() => {
+      this.db
+        .prepare(
+          'UPDATE jobs SET status = ?, stage = ?, current = ?, total = ?, message = ?, cooldown_until = NULL, updated_at = ? WHERE id = ?'
+        )
+        .run('canceled', stage, current, total, 'Canceled', now, id);
     });
     txn();
   }
@@ -572,10 +579,12 @@ export class SQLiteAdapter implements DatabaseAdapter {
     total: number
   ): Promise<void> {
     const now = new Date().toISOString();
-    const txn = this.db!.transaction(() => {
-      this.db!.prepare(
-        'UPDATE jobs SET status = ?, stage = ?, current = ?, total = ?, message = ?, cooldown_until = NULL, updated_at = ? WHERE id = ?'
-      ).run('paused', stage, current, total, 'Paused', now, id);
+    const txn = this.db.transaction(() => {
+      this.db
+        .prepare(
+          'UPDATE jobs SET status = ?, stage = ?, current = ?, total = ?, message = ?, cooldown_until = NULL, updated_at = ? WHERE id = ?'
+        )
+        .run('paused', stage, current, total, 'Paused', now, id);
     });
     txn();
   }
@@ -585,14 +594,14 @@ export class SQLiteAdapter implements DatabaseAdapter {
   }
 
   async getAllRunningJobs(): Promise<ProcessingJob[]> {
-    const stmt = this.db!.prepare('SELECT * FROM jobs WHERE status = ? ORDER BY created_at ASC');
+    const stmt = this.db.prepare('SELECT * FROM jobs WHERE status = ? ORDER BY created_at ASC');
     const rows = stmt.all('running') as DatabaseRow[];
     return rows.map(this.mapRowToJob);
   }
 
   async incrementJobRetry(id: string): Promise<void> {
     const now = new Date().toISOString();
-    const stmt = this.db!.prepare(
+    const stmt = this.db.prepare(
       'UPDATE jobs SET retry_count = retry_count + 1, updated_at = ? WHERE id = ?'
     );
     stmt.run(now, id);
@@ -602,7 +611,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
     const now = new Date();
     const cutoff = new Date(now.getTime() - stalledThresholdMs).toISOString();
 
-    const stmt = this.db!.prepare(
+    const stmt = this.db.prepare(
       `UPDATE jobs 
        SET status = 'queued', message = 'Recovered from stalled state', updated_at = ? 
        WHERE status = 'running' AND updated_at < ?`

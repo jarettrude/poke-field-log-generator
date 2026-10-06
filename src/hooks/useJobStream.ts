@@ -7,13 +7,13 @@
  * Result compilation still fetches from the REST API on terminal events.
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  getSummariesByGeneration,
-  getAudioLogsByGeneration,
   getAudioLog,
+  getAudioLogsByGeneration,
+  getSummariesByGeneration,
 } from '@/services/storageService';
-import { ProcessedPokemon, CooldownState } from '@/types';
+import type { CooldownState, ProcessedPokemon } from '@/types';
 
 interface UseJobStreamProps {
   onJobComplete?: (
@@ -126,8 +126,9 @@ export function useJobStream({
 
   const fetchPokemonData = useCallback(
     async (pokemonId: number): Promise<{ imageUrl?: string; displayName?: string }> => {
-      if (pokemonDataCache.current.has(pokemonId)) {
-        return pokemonDataCache.current.get(pokemonId)!;
+      const cached = pokemonDataCache.current.get(pokemonId);
+      if (cached !== undefined) {
+        return cached;
       }
 
       try {

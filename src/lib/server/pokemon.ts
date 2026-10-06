@@ -2,10 +2,11 @@
  * Server-side Pokémon data fetching with local caching and sprite downloads.
  */
 
-import fs from 'fs/promises';
-import path from 'path';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { getDatabase } from '@/lib/db/adapter';
-import { PokemonDetails, PokemonSprites, VariantCategory } from '../../types';
+import { extractIdFromUrl } from '@/utils/pokemonUtils';
+import type { PokemonDetails, PokemonSprites, VariantCategory } from '../../types';
 
 const BASE_URL = 'https://pokeapi.co/api/v2';
 const POKEMON_IMAGE_DIR = path.join(process.cwd(), 'public', 'pokemon');
@@ -121,13 +122,13 @@ function formatDisplayName(
   if (!formName || category === 'default') return capitalizedBase;
 
   if (category === 'regional' && regionName) {
-    const adjective = regionName.endsWith('a') ? regionName.slice(0, -1) + 'n' : regionName + 'ian';
+    const adjective = regionName.endsWith('a') ? `${regionName.slice(0, -1)}n` : `${regionName}ian`;
     return `${adjective} ${capitalizedBase}`;
   }
 
   if (category === 'mega') {
     const suffix = formName.replace('mega', '').replace(/-/g, ' ').trim().toUpperCase();
-    return `Mega ${capitalizedBase}${suffix ? ' ' + suffix : ''}`;
+    return `Mega ${capitalizedBase}${suffix ? ` ${suffix}` : ''}`;
   }
 
   if (category === 'gmax') return `Gigantamax ${capitalizedBase}`;
@@ -253,7 +254,7 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
     imageSvgUrl,
   });
 
-  const generationId = parseInt(speciesData.generation.url.split('/').filter(Boolean).pop()!, 10);
+  const generationId = extractIdFromUrl(speciesData.generation.url);
 
   const generationRes = await fetch(speciesData.generation.url);
   let region = 'Unknown';
@@ -264,9 +265,7 @@ export async function getOrFetchPokemonDetailsServer(id: number): Promise<Pokemo
 
   const speciesId = speciesData.id;
   const isDefault =
-    speciesData.varieties.find(
-      v => parseInt(v.pokemon.url.split('/').filter(Boolean).pop()!) === id
-    )?.is_default ?? true;
+    speciesData.varieties.find(v => extractIdFromUrl(v.pokemon.url) === id)?.is_default ?? true;
 
   let formName: string | null = null;
   let isMega = false;

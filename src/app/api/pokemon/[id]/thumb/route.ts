@@ -1,6 +1,6 @@
-import { NextRequest } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import type { NextRequest } from 'next/server';
 import sharp from 'sharp';
 
 const POKEMON_IMAGE_DIR = path.join(process.cwd(), 'public', 'pokemon');
@@ -28,7 +28,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   try {
     const { id } = await params;
     const pokemonId = parseInt(id, 10);
-    if (isNaN(pokemonId) || pokemonId < 1) {
+    if (Number.isNaN(pokemonId) || pokemonId < 1) {
       return new Response('Invalid Pokémon id', { status: 400 });
     }
 

@@ -1,5 +1,5 @@
 import { getDatabase } from '@/lib/db/adapter';
-import { successResponse, errorResponse } from '@/lib/server/api';
+import { errorResponse, successResponse } from '@/lib/server/api';
 
 export const runtime = 'nodejs';
 
@@ -11,18 +11,15 @@ export async function GET(request: Request) {
 
     const db = await getDatabase();
 
-    let summaries;
     if (generationIdParam) {
       const generationId = parseInt(generationIdParam, 10);
       if (!Number.isFinite(generationId) || generationId <= 0) {
         return errorResponse('Invalid generationId', 400);
       }
-      summaries = await db.getSummariesByGeneration(generationId);
-    } else {
-      summaries = await db.getAllSummaries();
+      return successResponse(await db.getSummariesByGeneration(generationId));
     }
 
-    return successResponse(summaries);
+    return successResponse(await db.getAllSummaries());
   } catch (error) {
     console.error('Error fetching summaries:', error);
     return errorResponse('Failed to fetch summaries', 500);

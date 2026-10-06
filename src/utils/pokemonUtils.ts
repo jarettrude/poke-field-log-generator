@@ -16,3 +16,17 @@ export const formatPokemonId = (id: number, maxId: number = 1025): string => {
   if (maxId >= 100) return id.toString().padStart(3, '0');
   return id.toString(); // No padding for ranges under 100
 };
+
+/**
+ * Extract the trailing numeric ID from a PokeAPI resource URL
+ * (e.g. "https://pokeapi.co/api/v2/pokemon/25/" -> 25).
+ * Throws if the URL has no trailing numeric segment.
+ */
+export const extractIdFromUrl = (url: string): number => {
+  const tail = url.split('/').filter(Boolean).pop();
+  const id = tail === undefined ? Number.NaN : Number.parseInt(tail, 10);
+  if (Number.isNaN(id)) {
+    throw new Error(`Could not extract Pokemon ID from URL: ${url}`);
+  }
+  return id;
+};
