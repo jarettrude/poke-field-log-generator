@@ -1,15 +1,15 @@
 /**
- * Tests for the TTS pipeline data flow: API response → PCM extraction → MP3 conversion.
+ * Tests for the TTS pipeline data flow: API response → audio extraction → MP3 conversion.
  *
  * All API interactions are mocked. No real Gemini API calls are made.
  * This validates the data transformation chain and error handling at each stage.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { convertPcmToMp3 } from '../audioConverter';
 
 /**
- * Generate synthetic PCM16LE audio as base64 (mimics Gemini TTS response).
+ * Generate synthetic PCM16LE audio as base64 (mimics a raw Gemini TTS response).
  */
 function generatePcmBase64(durationMs: number, sampleRate = 24000): string {
   const numSamples = Math.floor((sampleRate * durationMs) / 1000);
@@ -19,6 +19,28 @@ function generatePcmBase64(durationMs: number, sampleRate = 24000): string {
     buffer.writeInt16LE(value, i * 2);
   }
   return buffer.toString('base64');
+}
+
+/**
+ * Wrap PCM16LE data in a RIFF/WAV header (mimics Gemini 3.8 TTS default output).
+ */
+function generateWavBase64(durationMs: number, sampleRate = 24000): string {
+  const pcm = Buffer.from(generatePcmBase64(durationMs, sampleRate), 'base64');
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0, 'latin1');
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write('WAVE', 8, 'latin1');
+  header.write('fmt ', 12, 'latin1');
+  header.writeUInt32LE(16, 16); // fmt chunk size
+  header.writeUInt16LE(1, 20); // PCM format
+  header.writeUInt16LE(1, 22); // mono
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28); // byte rate
+  header.writeUInt16LE(2, 32); // block align
+  header.writeUInt16LE(16, 34); // bits per sample
+  header.write('data', 36, 'latin1');
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]).toString('base64');
 }
 
 /**
@@ -138,10 +160,12 @@ describe('TTS pipeline: end-to-end data flow (mocked API)', () => {
 
     // Step 2: Extract audio (same logic as gemini.ts)
     const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-    expect(inlineData?.data).toBeTruthy();
+    if (!inlineData?.data) {
+      throw new Error('Mock response missing inline audio data');
+    }
 
     // Step 3: Convert PCM → MP3 (same as jobRunner.ts)
-    const mp3Base64 = await convertPcmToMp3(inlineData!.data!, 24000, 128);
+    const mp3Base64 = await convertPcmToMp3(inlineData.data, 24000, 128);
 
     // Step 4: Validate MP3 output
     expect(mp3Base64).toBeTruthy();
@@ -149,6 +173,24 @@ describe('TTS pipeline: end-to-end data flow (mocked API)', () => {
     expect(mp3Buffer.length).toBeGreaterThan(0);
 
     // Verify MP3 magic bytes
+    const firstByte = mp3Buffer[0];
+    expect(firstByte === 0xff || firstByte === 0x49).toBe(true);
+  });
+
+  it('should convert WAV response (Gemini 3.8 default) to valid MP3', async () => {
+    // Gemini 3.8 TTS unary requests return audio/wav by default
+    const wavBase64 = generateWavBase64(1000);
+    const response = mockGeminiTtsResponse({ data: wavBase64, mimeType: 'audio/wav' });
+
+    const inlineData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+    if (!inlineData?.data) {
+      throw new Error('Mock response missing inline audio data');
+    }
+
+    const mp3Base64 = await convertPcmToMp3(inlineData.data, 24000, 128);
+
+    const mp3Buffer = Buffer.from(mp3Base64, 'base64');
+    expect(mp3Buffer.length).toBeGreaterThan(0);
     const firstByte = mp3Buffer[0];
     expect(firstByte === 0xff || firstByte === 0x49).toBe(true);
   });
@@ -183,6 +225,7 @@ describe('TTS pipeline: mimeType validation logic', () => {
     if (resolved === 'unknown') return false;
     if (resolved.startsWith('audio/L16')) return false;
     if (resolved.startsWith('audio/pcm')) return false;
+    if (resolved.startsWith('audio/wav')) return false;
     return true;
   }
 
@@ -194,12 +237,12 @@ describe('TTS pipeline: mimeType validation logic', () => {
     expect(wouldWarnMimeType('audio/pcm')).toBe(false);
   });
 
-  it('should not warn for undefined (unknown)', () => {
-    expect(wouldWarnMimeType(undefined)).toBe(false);
+  it('should not warn for audio/wav (Gemini 3.8 default)', () => {
+    expect(wouldWarnMimeType('audio/wav')).toBe(false);
   });
 
-  it('should warn for audio/wav', () => {
-    expect(wouldWarnMimeType('audio/wav')).toBe(true);
+  it('should not warn for undefined (unknown)', () => {
+    expect(wouldWarnMimeType(undefined)).toBe(false);
   });
 
   it('should warn for audio/mpeg', () => {
@@ -244,7 +287,7 @@ describe('TTS pipeline: error resilience', () => {
     // Directly test that spawn fails gracefully with a bad path
     // We can't easily mock ffmpegPath in the module, but we can test
     // that the error handler works by verifying the function signature
-    const { spawn } = await import('child_process');
+    const { spawn } = await import('node:child_process');
 
     await expect(
       new Promise((_resolve, reject) => {

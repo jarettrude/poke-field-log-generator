@@ -1,22 +1,23 @@
 /**
  * Server-side configuration constants for job processing and TTS.
  *
- * Model-specific rate limits (paid tier 1, as of Feb 2026):
+ * Models (as of Oct 2026):
  *
- * gemini-3-flash-preview (text generation):
- *   - RPM: 2,000 | TPM: 4M | RPD: Unlimited
- *   - Stable model with generous limits
+ * gemini-3.8-flash (text generation):
+ *   - Current stable Flash model; free tier eligible
  *
- * gemini-2.5-pro-preview-tts (audio generation - primary):
- *   - RPM: 10 | TPM: 1.3K/10K | RPD: 50
- *   - Very limited daily quota — every failed call counts!
+ * gemini-3.8-flash-tts (audio generation - primary):
+ *   - Flagship TTS; free tier eligible
  *
- * gemini-2.5-flash-preview-tts (audio generation - fallback):
- *   - RPM: 10 | TPM: 1.35K/10K | RPD: 100
- *   - Used as fallback when Pro daily quota is exhausted
+ * gemini-3.8-flash-lite-tts (audio generation - fallback):
+ *   - Fast, cost-efficient TTS; free tier eligible
+ *   - Used as fallback when the primary model's daily quota is exhausted
+ *
+ * Per-model rate limits (RPM/RPD) vary by usage tier and are not published
+ * for the free tier — check your project's active limits in Google AI Studio.
  *
  * TTS retry budget (gemini.ts):
- *   - 1 retry per model, Pro→Flash fallback = max 4 API calls per Pokémon
+ *   - 1 retry per model, primary→fallback = max 4 API calls per Pokémon
  *   - Daily quota exhaustion triggers IMMEDIATE fallback (no retries)
  *   - jobRunner does NOT add its own retry layer for TTS
  *

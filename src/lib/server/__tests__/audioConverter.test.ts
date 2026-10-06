@@ -9,7 +9,7 @@
  *   - Edge cases (silence, very short audio, large audio)
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { convertPcmToMp3 } from '../audioConverter';
 
 /**
@@ -144,7 +144,7 @@ describe('ffmpeg-static binary', () => {
 
   it('should point to an existing binary', async () => {
     const ffmpegPath = (await import('ffmpeg-static')).default;
-    const { existsSync } = await import('fs');
+    const { existsSync } = await import('node:fs');
     expect(existsSync(ffmpegPath as string)).toBe(true);
   });
 });

@@ -1,11 +1,14 @@
 /**
  * Server-side Gemini AI client for summary generation and text-to-speech.
- * 
- * Rate limits configured for PAID API keys:
- * - Pro TTS: 50 RPD (requests per day)
- * - Flash TTS: 100 RPD (paid) / 10 RPD (free tier)
- * 
- * Note: Free tier users will hit quota limits much faster
+ *
+ * Models (as of Oct 2026):
+ * - gemini-3.8-flash: summary generation (stable, free tier eligible)
+ * - gemini-3.8-flash-tts: primary TTS (stable, free tier eligible)
+ * - gemini-3.8-flash-lite-tts: fallback TTS (stable, free tier eligible)
+ *
+ * Per-model free-tier rate limits are not published; view the active
+ * limits for your project in Google AI Studio. Requires
+ * @google/genai >= 2.24.0 for the 3.8 TTS models.
  */
 
 import { GoogleGenAI, Modality, Type } from '@google/genai';
@@ -28,21 +31,25 @@ const RATE_LIMIT_MAX_MS = 120000;
 // is maxed out. Each new batch should call resetBatchQuotaState().
 
 interface BatchQuotaState {
-  proExhausted: boolean;
-  flashExhausted: boolean;
+  primaryExhausted: boolean;
+  fallbackExhausted: boolean;
 }
 
 const batchQuota: BatchQuotaState = {
-  proExhausted: false,
-  flashExhausted: false,
+  primaryExhausted: false,
+  fallbackExhausted: false,
 };
+
+const SUMMARY_MODEL = 'gemini-3.8-flash';
+const TTS_PRIMARY_MODEL = 'gemini-3.8-flash-tts';
+const TTS_FALLBACK_MODEL = 'gemini-3.8-flash-lite-tts';
 
 /**
  * Reset batch quota state. Call at the start of every new batch.
  */
 export function resetBatchQuotaState(): void {
-  batchQuota.proExhausted = false;
-  batchQuota.flashExhausted = false;
+  batchQuota.primaryExhausted = false;
+  batchQuota.fallbackExhausted = false;
 }
 
 /**
@@ -118,7 +125,7 @@ function calculateBackoff(attempt: number, isRateLimit: boolean): number {
   const baseMs = isRateLimit ? RATE_LIMIT_BASE_MS : BACKOFF_BASE_MS;
   const maxMs = isRateLimit ? RATE_LIMIT_MAX_MS : BACKOFF_MAX_MS;
 
-  const exponentialDelay = Math.min(baseMs * Math.pow(2, attempt), maxMs);
+  const exponentialDelay = Math.min(baseMs * 2 ** attempt, maxMs);
 
   const jitter = exponentialDelay * (0.5 + Math.random());
 
@@ -185,7 +192,7 @@ export async function generateSummary(details: PokemonDetails, region: string): 
     const prompt = `${systemPrompt}\n\nPOKEMON DATA:\n${pokemonContext}`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: SUMMARY_MODEL,
       contents: prompt,
       config: {
         temperature: 0.85,
@@ -225,16 +232,18 @@ export async function generateSummary(details: PokemonDetails, region: string): 
 }
 
 /**
- * Generate TTS audio from text using Gemini. Returns base64-encoded PCM audio.
+ * Generate TTS audio from text using Gemini. Returns base64-encoded audio.
  *
- * Strategy: Pro first with 1 retry, then Flash fallback with 1 retry.
- * Max 4 API calls per Pokémon (1+1 Pro, 1+1 Flash).
+ * Gemini 3.8 TTS treats input text strictly as a verbatim transcript, so the
+ * Director's Note prompt is passed as `speechMetadata.style` rather than
+ * embedded in the text. Unary requests return `audio/wav` by default; the
+ * audio converter detects the RIFF header automatically.
+ *
+ * Strategy: Flash TTS first with 1 retry, then Flash-Lite TTS fallback with
+ * 1 retry. Max 4 API calls per Pokémon.
  *
  * Daily quota exhaustion (RPD) triggers IMMEDIATE fallback (no retries).
  * Transient rate limits (RPM) retry with exponential backoff (30s base).
- *
- * Budget: Pro has 50 RPD (paid only), Flash has 100 RPD (paid) / 10 RPD (free tier). Every call counts.
- * Free tier users will exhaust Flash quota after just 10 requests per day.
  * The jobRunner does NOT add its own retry layer on top of this.
  *
  * Batch-level optimization: Once a model's daily quota is exhausted within
@@ -243,7 +252,7 @@ export async function generateSummary(details: PokemonDetails, region: string): 
  */
 export async function generateTts(params: { text: string; voiceName: string }): Promise<string> {
   // If both models are already known-exhausted, fail immediately
-  if (batchQuota.proExhausted && batchQuota.flashExhausted) {
+  if (batchQuota.primaryExhausted && batchQuota.fallbackExhausted) {
     throw new TtsQuotaExhaustedError();
   }
 
@@ -255,9 +264,11 @@ export async function generateTts(params: { text: string; voiceName: string }): 
       model,
       contents: [
         {
+          role: 'user',
           parts: [
             {
-              text: `${instruction}\n\nTEXT:\n${params.text}`,
+              text: params.text,
+              speechMetadata: { style: instruction },
             },
           ],
         },
@@ -265,9 +276,7 @@ export async function generateTts(params: { text: string; voiceName: string }): 
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: params.voiceName },
-          },
+          voiceConfig: { voice: params.voiceName },
         },
       },
     });
@@ -281,48 +290,49 @@ export async function generateTts(params: { text: string; voiceName: string }): 
     if (
       mimeType !== 'unknown' &&
       !mimeType.startsWith('audio/L16') &&
-      !mimeType.startsWith('audio/pcm')
+      !mimeType.startsWith('audio/pcm') &&
+      !mimeType.startsWith('audio/wav')
     ) {
-      console.warn(`Unexpected TTS mimeType: ${mimeType}. Expected audio/L16 or audio/pcm.`);
+      console.warn(
+        `Unexpected TTS mimeType: ${mimeType}. Expected audio/wav, audio/L16, or audio/pcm.`
+      );
     }
 
     return inlineData.data;
   };
 
-  // Try Pro first (unless already exhausted for this batch)
-  if (!batchQuota.proExhausted) {
+  // Try the primary model first (unless already exhausted for this batch)
+  if (!batchQuota.primaryExhausted) {
     try {
-      console.log('Attempting TTS with gemini-2.5-pro-preview-tts...');
-      return await withRetry(() => makeTtsRequest('gemini-2.5-pro-preview-tts'), MAX_RETRIES_TTS);
-    } catch (proError) {
-      if (isDailyQuotaExhausted(proError)) {
-        batchQuota.proExhausted = true;
-        console.warn(
-          'gemini-2.5-pro-preview-tts daily quota exhausted. Skipping Pro for rest of batch.'
-        );
+      console.log(`Attempting TTS with ${TTS_PRIMARY_MODEL}...`);
+      return await withRetry(() => makeTtsRequest(TTS_PRIMARY_MODEL), MAX_RETRIES_TTS);
+    } catch (primaryError) {
+      if (isDailyQuotaExhausted(primaryError)) {
+        batchQuota.primaryExhausted = true;
+        console.warn(`${TTS_PRIMARY_MODEL} daily quota exhausted. Skipping it for rest of batch.`);
       } else {
         console.warn(
-          `gemini-2.5-pro-preview-tts failed (exhausted all retries). Falling back to Flash...`
+          `${TTS_PRIMARY_MODEL} failed (exhausted all retries). Falling back to ${TTS_FALLBACK_MODEL}...`
         );
       }
     }
   } else {
-    console.log('Skipping Pro TTS (daily quota already exhausted this batch). Using Flash...');
+    console.log(
+      `Skipping ${TTS_PRIMARY_MODEL} (daily quota already exhausted this batch). Using ${TTS_FALLBACK_MODEL}...`
+    );
   }
 
-  // Try Flash (unless already exhausted for this batch)
-  if (!batchQuota.flashExhausted) {
+  // Try the fallback model (unless already exhausted for this batch)
+  if (!batchQuota.fallbackExhausted) {
     try {
-      return await withRetry(() => makeTtsRequest('gemini-2.5-flash-preview-tts'), MAX_RETRIES_TTS);
-    } catch (flashError) {
-      if (isDailyQuotaExhausted(flashError)) {
-        batchQuota.flashExhausted = true;
-        console.warn(
-          'gemini-2.5-flash-preview-tts daily quota exhausted. All TTS models exhausted.'
-        );
+      return await withRetry(() => makeTtsRequest(TTS_FALLBACK_MODEL), MAX_RETRIES_TTS);
+    } catch (fallbackError) {
+      if (isDailyQuotaExhausted(fallbackError)) {
+        batchQuota.fallbackExhausted = true;
+        console.warn(`${TTS_FALLBACK_MODEL} daily quota exhausted. All TTS models exhausted.`);
       } else {
-        // Non-quota error on Flash — re-throw as-is
-        throw flashError;
+        // Non-quota error on fallback — re-throw as-is
+        throw fallbackError;
       }
     }
   }

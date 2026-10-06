@@ -9,25 +9,25 @@
  * DB writes persist state for crash recovery; SSE events drive the UI.
  */
 
-import { getDatabase } from '@/lib/db/adapter';
 import type { ProcessingJob, ProcessingStage } from '@/lib/db/adapter';
+import { getDatabase } from '@/lib/db/adapter';
+import { convertPcmToMp3 } from './audioConverter';
+import {
+  jitteredCooldown,
+  SERVER_SUMMARY_COOLDOWN_MS,
+  SERVER_TTS_AUDIO_FORMAT,
+  SERVER_TTS_COOLDOWN_MS,
+  SERVER_TTS_MP3_BITRATE,
+  SERVER_TTS_SAMPLE_RATE,
+} from './config';
 import {
   generateSummary,
   generateTts,
   resetBatchQuotaState,
   TtsQuotaExhaustedError,
 } from './gemini';
-import {
-  jitteredCooldown,
-  SERVER_SUMMARY_COOLDOWN_MS,
-  SERVER_TTS_AUDIO_FORMAT,
-  SERVER_TTS_COOLDOWN_MS,
-  SERVER_TTS_SAMPLE_RATE,
-  SERVER_TTS_MP3_BITRATE,
-} from './config';
-import { convertPcmToMp3 } from './audioConverter';
-import { getOrFetchPokemonDetailsServer } from './pokemon';
 import { jobEvents } from './jobEvents';
+import { getOrFetchPokemonDetailsServer } from './pokemon';
 
 const globalRunner = globalThis as unknown as {
   __jobRunnerStarted?: boolean;
@@ -162,7 +162,7 @@ async function processSummaryStage(job: ProcessingJob): Promise<'ok' | 'paused' 
           throw error;
         }
 
-        const backoffMs = RETRY_BASE_DELAY_MS * Math.pow(2, retryCount - 1);
+        const backoffMs = RETRY_BASE_DELAY_MS * 2 ** (retryCount - 1);
         await setProgress({
           jobId: job.id,
           stage: 'summary',
@@ -301,7 +301,7 @@ async function processAudioStage(job: ProcessingJob): Promise<'ok' | 'paused' | 
         const errorMsg =
           `Daily API quota exceeded: ${completed} of ${total} audio files were generated successfully. ` +
           `The remaining ${total - completed} could not be processed because both TTS models ` +
-          `(Pro and Flash) have hit their daily limits. Quotas reset at midnight Pacific Time.`;
+          `(Flash TTS and Flash-Lite TTS) have hit their daily limits. Quotas reset at midnight Pacific Time.`;
         await setProgress({
           jobId: job.id,
           stage: 'audio',
@@ -372,7 +372,7 @@ function formatUserFriendlyError(rawMessage: string): string {
   }
 
   if (rawMessage.length > 300) {
-    return rawMessage.substring(0, 297) + '...';
+    return `${rawMessage.substring(0, 297)}...`;
   }
 
   return rawMessage;

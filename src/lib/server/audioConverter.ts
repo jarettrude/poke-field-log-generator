@@ -1,16 +1,21 @@
 /**
  * Audio conversion utilities using ffmpeg-static.
- * Converts PCM audio to MP3 format for optimized storage.
+ * Converts TTS audio (raw PCM or WAV) to MP3 format for optimized storage.
  */
 
-import { spawn } from 'child_process';
+import { spawn } from 'node:child_process';
 import ffmpegPath from 'ffmpeg-static';
 
 /**
- * Convert base64-encoded PCM audio to base64-encoded MP3.
+ * Convert base64-encoded audio to base64-encoded MP3.
  *
- * @param pcmBase64 Base64-encoded PCM16LE data (mono).
- * @param sampleRate Sample rate in Hz (default: 24000).
+ * Accepts either headerless PCM16LE (mono) or a RIFF/WAV container — the
+ * format is detected from the RIFF magic bytes. Gemini 3.8 TTS models
+ * return `audio/wav` by default on unary requests, while older models and
+ * explicit `audio/l16` responses are headerless PCM.
+ *
+ * @param pcmBase64 Base64-encoded PCM16LE or WAV data (mono).
+ * @param sampleRate Sample rate in Hz for raw PCM input (default: 24000).
  * @param bitrate MP3 bitrate in kbps (default: 128).
  * @returns Promise resolving to base64-encoded MP3 data.
  */
@@ -27,23 +32,27 @@ export async function convertPcmToMp3(
     const pcmBuffer = Buffer.from(pcmBase64, 'base64');
 
     if (pcmBuffer.length === 0) {
-      reject(new Error('PCM input buffer is empty (0 bytes). TTS response may have been invalid.'));
+      reject(
+        new Error('Audio input buffer is empty (0 bytes). TTS response may have been invalid.')
+      );
       return;
     }
 
+    const isWav =
+      pcmBuffer.length > 12 &&
+      pcmBuffer.toString('latin1', 0, 4) === 'RIFF' &&
+      pcmBuffer.toString('latin1', 8, 12) === 'WAVE';
+
     console.log(
-      `[audioConverter] Converting PCM→MP3: ${pcmBuffer.length} bytes, ${sampleRate}Hz, ${bitrate}kbps`
+      `[audioConverter] Converting ${isWav ? 'WAV' : 'PCM'}→MP3: ${pcmBuffer.length} bytes, ${sampleRate}Hz, ${bitrate}kbps`
     );
 
+    const inputArgs = isWav
+      ? ['-i', 'pipe:0']
+      : ['-f', 's16le', '-ar', sampleRate.toString(), '-ac', '1', '-i', 'pipe:0'];
+
     const ffmpeg = spawn(ffmpegPath as string, [
-      '-f',
-      's16le',
-      '-ar',
-      sampleRate.toString(),
-      '-ac',
-      '1',
-      '-i',
-      'pipe:0',
+      ...inputArgs,
       '-f',
       'mp3',
       '-ab',
