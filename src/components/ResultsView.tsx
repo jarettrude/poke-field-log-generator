@@ -1,9 +1,9 @@
-import React from 'react';
+import { AlertTriangle, ArrowLeft, CheckCircle, Trash2 } from 'lucide-react';
 import Image from 'next/image';
-import { ArrowLeft, Trash2, CheckCircle, AlertTriangle } from 'lucide-react';
-import { ProcessedPokemon } from '../types';
-import { mp3ToUrl } from '../services/audioUtils';
+import type React from 'react';
 import { POKEBALL_IMAGE } from '../constants';
+import { mp3ToUrl, transcriptToCaptionUrl } from '../services/audioUtils';
+import type { ProcessedPokemon } from '../types';
 import { formatPokemonId } from '../utils/pokemonUtils';
 
 interface ResultsViewProps {
@@ -37,7 +37,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               <AlertTriangle className="h-5 w-5" style={{ color: '#dc2626' }} />
             </div>
             <div>
-              <h3 className="text-sm font-bold" style={{ color: '#991b1b' }}>
+              <h3 className="font-bold text-sm" style={{ color: '#991b1b' }}>
                 Generation Stopped
               </h3>
               <p className="mt-1 text-sm leading-relaxed" style={{ color: '#7f1d1d' }}>
@@ -69,10 +69,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
               )}
             </div>
             <div>
-              <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              <h2 className="font-bold text-xl" style={{ color: 'var(--text-primary)' }}>
                 {hasError ? 'Partial Results' : 'Generation Complete'}
               </h2>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+              <p className="font-medium text-sm" style={{ color: 'var(--text-secondary)' }}>
                 {hasError
                   ? `${results.length} field ${results.length === 1 ? 'log' : 'logs'} generated before the error`
                   : `${results.length} field ${results.length === 1 ? 'log' : 'logs'} generated successfully`}
@@ -80,11 +80,11 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             </div>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3">
-            <button onClick={onBack} className="btn btn-secondary">
+            <button type="button" onClick={onBack} className="btn btn-secondary">
               <ArrowLeft className="h-4 w-4" />
               New Mission
             </button>
-            <button onClick={onClear} className="btn btn-outline">
+            <button type="button" onClick={onClear} className="btn btn-outline">
               <Trash2 className="h-4 w-4" />
               Clear Results
             </button>
@@ -106,7 +106,7 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                 unoptimized={!!(r.pngData || r.svgData)}
               />
               <div>
-                <span className="text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>
+                <span className="font-semibold text-xs" style={{ color: 'var(--text-tertiary)' }}>
                   #{formatPokemonId(r.id)}
                 </span>
                 <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>
@@ -126,7 +126,15 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
                 className="h-10 w-full rounded-lg"
                 src={mp3ToUrl(r.audioData)}
                 style={{ accentColor: 'var(--accent-primary)' }}
-              />
+              >
+                <track
+                  kind="captions"
+                  src={transcriptToCaptionUrl(r.summary)}
+                  srcLang="en"
+                  label="Transcript"
+                  default
+                />
+              </audio>
             )}
           </div>
         ))}
@@ -138,10 +146,10 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
           className="rounded-xl border-2 border-dashed p-12 text-center"
           style={{ borderColor: 'var(--border-secondary)' }}
         >
-          <p className="text-lg font-medium" style={{ color: 'var(--text-tertiary)' }}>
+          <p className="font-medium text-lg" style={{ color: 'var(--text-tertiary)' }}>
             No results to display
           </p>
-          <button onClick={onBack} className="btn btn-primary mt-4">
+          <button type="button" onClick={onBack} className="btn btn-primary mt-4">
             <ArrowLeft className="h-4 w-4" />
             Start a New Mission
           </button>

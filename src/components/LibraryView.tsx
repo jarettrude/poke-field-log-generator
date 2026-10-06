@@ -1,18 +1,19 @@
-import React, { useState, useRef } from 'react';
 import {
-  ChevronUp,
   ChevronDown,
-  RefreshCw,
-  Trash2,
+  ChevronUp,
   Download,
-  Upload,
   FileText,
   Mic,
+  RefreshCw,
   Search,
+  Trash2,
+  Upload,
 } from 'lucide-react';
-import { StoredSummary, StoredAudioLog } from '../services/storageService';
+import type React from 'react';
+import { useRef, useState } from 'react';
+import { mp3ToUrl, transcriptToCaptionUrl } from '../services/audioUtils';
+import type { StoredAudioLog, StoredSummary } from '../services/storageService';
 import { formatPokemonId } from '../utils/pokemonUtils';
-import { mp3ToUrl } from '../services/audioUtils';
 
 interface LibraryViewProps {
   summaries: StoredSummary[];
@@ -129,8 +130,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       <div className="mb-8">
         <div className="mb-4 flex gap-1 rounded-lg bg-amber-50/70 p-1">
           <button
+            type="button"
             onClick={() => setActiveTab('summaries')}
-            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 rounded-md px-4 py-2 font-medium text-sm transition-colors ${
               activeTab === 'summaries'
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-700 hover:text-slate-900'
@@ -140,8 +142,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             Summaries
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('audio')}
-            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 rounded-md px-4 py-2 font-medium text-sm transition-colors ${
               activeTab === 'audio'
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-700 hover:text-slate-900'
@@ -153,10 +156,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-slate-800">
+            <h2 className="font-semibold text-slate-800 text-xl">
               {activeTab === 'summaries' ? 'Summary Library' : 'Audio Library'}
             </h2>
-            <p className="text-sm text-slate-500">
+            <p className="text-slate-500 text-sm">
               {activeTab === 'summaries'
                 ? `${summaries.length} summaries saved`
                 : `${audioLogs.length} audio logs saved`}
@@ -180,7 +183,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             <select
               value={filter}
               onChange={e => setFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="h-10 rounded-lg border border-amber-100 bg-white px-3 text-sm font-medium text-slate-800"
+              className="h-10 rounded-lg border border-amber-100 bg-white px-3 font-medium text-slate-800 text-sm"
             >
               <option value="all">All Generations</option>
               {generations.map(g => (
@@ -193,7 +196,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             <select
               value={regionFilter}
               onChange={e => setRegionFilter(e.target.value === 'all' ? 'all' : e.target.value)}
-              className="h-10 rounded-lg border border-amber-100 bg-white px-3 text-sm font-medium text-slate-800"
+              className="h-10 rounded-lg border border-amber-100 bg-white px-3 font-medium text-slate-800 text-sm"
             >
               <option value="all">All Regions</option>
               {regions.map(r => (
@@ -206,8 +209,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             {activeTab === 'summaries' && (
               <div className="flex gap-1 rounded-lg bg-amber-50/70 p-1">
                 <button
+                  type="button"
                   onClick={() => setSavedFilter('all')}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`rounded-md px-3 py-1.5 font-semibold text-xs transition-colors ${
                     savedFilter === 'all'
                       ? 'bg-white text-slate-800 shadow-sm'
                       : 'text-slate-600 hover:text-slate-800'
@@ -216,8 +220,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   All
                 </button>
                 <button
+                  type="button"
                   onClick={() => setSavedFilter('withAudio')}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`rounded-md px-3 py-1.5 font-semibold text-xs transition-colors ${
                     savedFilter === 'withAudio'
                       ? 'bg-white text-slate-800 shadow-sm'
                       : 'text-slate-600 hover:text-slate-800'
@@ -226,8 +231,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                   With audio
                 </button>
                 <button
+                  type="button"
                   onClick={() => setSavedFilter('missingAudio')}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`rounded-md px-3 py-1.5 font-semibold text-xs transition-colors ${
                     savedFilter === 'missingAudio'
                       ? 'bg-white text-slate-800 shadow-sm'
                       : 'text-slate-600 hover:text-slate-800'
@@ -248,7 +254,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 setSortBy(nextBy);
                 setSortDir(nextDir);
               }}
-              className="h-10 rounded-lg border border-amber-100 bg-white px-3 text-sm font-medium text-slate-800"
+              className="h-10 rounded-lg border border-amber-100 bg-white px-3 font-medium text-slate-800 text-sm"
             >
               <option value="updatedAt:desc">Newest</option>
               <option value="updatedAt:asc">Oldest</option>
@@ -259,15 +265,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             </select>
 
             <button
+              type="button"
               onClick={onExport}
-              className="flex h-10 items-center justify-center rounded-lg border border-amber-100 bg-white px-4 text-sm font-medium text-slate-800 hover:bg-amber-50"
+              className="flex h-10 items-center justify-center rounded-lg border border-amber-100 bg-white px-4 font-medium text-slate-800 text-sm hover:bg-amber-50"
               title="Export JSON"
             >
               <Download className="h-4 w-4" />
             </button>
             <button
+              type="button"
               onClick={handleImportClick}
-              className="flex h-10 items-center justify-center rounded-lg border border-amber-100 bg-white px-4 text-sm font-medium text-slate-800 hover:bg-amber-50"
+              className="flex h-10 items-center justify-center rounded-lg border border-amber-100 bg-white px-4 font-medium text-slate-800 text-sm hover:bg-amber-50"
               title="Import JSON"
             >
               <Upload className="h-4 w-4" />
@@ -280,8 +288,9 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               className="hidden"
             />
             <button
+              type="button"
               onClick={onRefresh}
-              className="bg-pokeball-600 hover:bg-pokeball-700 flex h-10 items-center justify-center rounded-lg px-4 text-sm font-medium text-white"
+              className="flex h-10 items-center justify-center rounded-lg bg-pokeball-600 px-4 font-medium text-sm text-white hover:bg-pokeball-700"
               title="Refresh"
             >
               <RefreshCw className="h-4 w-4" />
@@ -294,7 +303,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
         sortedSummaries.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-white py-16 text-center">
             <p className="text-lg text-slate-500">No matches found.</p>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-slate-400 text-sm">
               Try adjusting your search or filters, or generate a new batch.
             </p>
           </div>
@@ -310,15 +319,15 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 >
                   <div className="mb-3 flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="text-xs font-semibold text-slate-400">
+                      <span className="font-semibold text-slate-400 text-xs">
                         #{formatPokemonId(summary.id)}
                       </span>
                       <h3 className="font-bold text-slate-800 capitalize">{summary.name}</h3>
-                      <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                      <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-500 text-xs">
                         {summary.region}
                       </span>
                       <span
-                        className={`rounded px-2 py-0.5 text-xs font-medium ${
+                        className={`rounded px-2 py-0.5 font-medium text-xs ${
                           hasAudio ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
                         }`}
                         title={hasAudio ? 'Audio saved' : 'No audio yet'}
@@ -328,28 +337,32 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     </div>
                     <div className="flex gap-2">
                       <button
+                        type="button"
                         onClick={() => onRegenerate(summary.id)}
-                        className="flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700"
+                        className="flex items-center gap-1 font-medium text-amber-600 text-xs hover:text-amber-700"
                       >
                         <RefreshCw className="h-3 w-3" /> Regenerate
                       </button>
                       <button
+                        type="button"
                         onClick={() => onDelete(summary.id)}
-                        className="flex items-center gap-1 text-xs font-medium text-rose-400 hover:text-rose-600"
+                        className="flex items-center gap-1 font-medium text-rose-400 text-xs hover:text-rose-600"
                       >
                         <Trash2 className="h-3 w-3" /> Delete
                       </button>
                     </div>
                   </div>
-                  <p
-                    className={`cursor-pointer text-sm leading-relaxed text-slate-600 ${isExpanded ? '' : 'line-clamp-3'}`}
+                  <button
+                    type="button"
+                    className={`block w-full cursor-pointer text-left text-slate-600 text-sm leading-relaxed ${isExpanded ? '' : 'line-clamp-3'}`}
                     onClick={() => toggleExpand(summary.id)}
                   >
                     {summary.summary}
-                  </p>
+                  </button>
                   <button
+                    type="button"
                     onClick={() => toggleExpand(summary.id)}
-                    className="mt-2 flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-slate-600"
+                    className="mt-2 flex items-center gap-1 font-medium text-slate-400 text-xs hover:text-slate-600"
                   >
                     {isExpanded ? (
                       <>
@@ -369,7 +382,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       ) : filteredAudioLogs.length === 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white py-16 text-center">
           <p className="text-lg text-slate-500">No matches found.</p>
-          <p className="mt-2 text-sm text-slate-400">Try adjusting your search or filters.</p>
+          <p className="mt-2 text-slate-400 text-sm">Try adjusting your search or filters.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -380,37 +393,47 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
             >
               <div className="mb-3 flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-semibold text-slate-400">
+                  <span className="font-semibold text-slate-400 text-xs">
                     #{formatPokemonId(audioLog.id)}
                   </span>
                   <h3 className="font-bold text-slate-800 capitalize">{audioLog.name}</h3>
-                  <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                  <span className="rounded bg-slate-100 px-2 py-0.5 text-slate-500 text-xs">
                     {audioLog.region}
                   </span>
                 </div>
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => onRegenerateAudio(audioLog.id)}
-                    className="flex items-center gap-1 text-xs font-medium text-amber-600 hover:text-amber-700"
+                    className="flex items-center gap-1 font-medium text-amber-600 text-xs hover:text-amber-700"
                   >
                     <RefreshCw className="h-3 w-3" /> Regenerate
                   </button>
                   <button
+                    type="button"
                     onClick={() => onDeleteAudio(audioLog.id)}
-                    className="flex items-center gap-1 text-xs font-medium text-rose-400 hover:text-rose-600"
+                    className="flex items-center gap-1 font-medium text-rose-400 text-xs hover:text-rose-600"
                   >
                     <Trash2 className="h-3 w-3" /> Delete
                   </button>
                 </div>
               </div>
               <div className="space-y-3">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2 text-slate-500 text-xs">
                   <span className="rounded bg-slate-100 px-2 py-1">Voice: {audioLog.voice}</span>
                   <span className="rounded bg-slate-100 px-2 py-1">
                     {audioLog.audioFormat} @ {audioLog.bitrate}kbps
                   </span>
                 </div>
-                <audio controls className="w-full" src={mp3ToUrl(audioLog.audioBase64)} />
+                <audio controls className="w-full" src={mp3ToUrl(audioLog.audioBase64)}>
+                  <track
+                    kind="captions"
+                    src={transcriptToCaptionUrl(summaries.find(s => s.id === audioLog.id)?.summary)}
+                    srcLang="en"
+                    label="Transcript"
+                    default
+                  />
+                </audio>
               </div>
             </div>
           ))}

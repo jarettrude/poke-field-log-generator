@@ -1,14 +1,15 @@
-import React, { useMemo } from 'react';
-import { Volume2, FileText, Wand2, Mic, Layers, Sparkles, Zap, Globe, Crown } from 'lucide-react';
-import {
-  Generation,
-  PokemonBaseInfo,
-  WorkflowMode,
-  CollectionType,
-  VariantCategory,
-} from '../types';
-import { StoredSummary, AudioLogMetadata } from '../services/storageService';
+import { Crown, FileText, Globe, Layers, Mic, Sparkles, Volume2, Wand2, Zap } from 'lucide-react';
+import type React from 'react';
+import { useMemo } from 'react';
 import { VOICE_OPTIONS } from '../constants';
+import type { AudioLogMetadata, StoredSummary } from '../services/storageService';
+import {
+  type CollectionType,
+  type Generation,
+  type PokemonBaseInfo,
+  type VariantCategory,
+  WorkflowMode,
+} from '../types';
 import { formatPokemonId } from '../utils/pokemonUtils';
 
 interface GenerationViewProps {
@@ -50,6 +51,9 @@ const VARIANT_CATEGORY_CONFIG: {
   { id: 'gmax', label: 'Gigantamax', icon: Crown, color: '#f59e0b' },
   { id: 'other', label: 'Other', icon: Sparkles, color: '#64748b' },
 ];
+
+// Stable keys for the loading-skeleton placeholders (static count, never reordered)
+const SKELETON_KEYS = Array.from({ length: 24 }, (_, i) => `skeleton-${i}`);
 
 export const GenerationView: React.FC<GenerationViewProps> = ({
   mode,
@@ -125,6 +129,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
         <div className="mb-6 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-3">
           {modeOptions.map(({ value, label, icon: Icon, desc }) => (
             <button
+              type="button"
               key={value}
               onClick={() => onModeChange(value)}
               className="flex items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 transition-all sm:justify-start sm:gap-3 sm:px-5"
@@ -136,7 +141,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
             >
               <Icon className="h-5 w-5 shrink-0" />
               <div className="text-left">
-                <div className="text-sm font-semibold sm:text-base">{label}</div>
+                <div className="font-semibold text-sm sm:text-base">{label}</div>
                 <div className="hidden text-xs opacity-75 sm:block">{desc}</div>
               </div>
             </button>
@@ -147,8 +152,9 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
       {/* Collection Type Toggle */}
       <div className="mb-6 grid grid-cols-2 gap-2 sm:flex sm:justify-center sm:gap-2">
         <button
+          type="button"
           onClick={() => onCollectionTypeChange('generation')}
-          className="flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all"
+          className="flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-2 font-medium text-sm transition-all"
           style={{
             background:
               collectionType === 'generation' ? 'var(--accent-primary)' : 'var(--surface-card)',
@@ -161,8 +167,9 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
           Generations
         </button>
         <button
+          type="button"
           onClick={() => onCollectionTypeChange('variants')}
-          className="flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-2 text-sm font-medium transition-all"
+          className="flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-2 font-medium text-sm transition-all"
           style={{
             background:
               collectionType === 'variants' ? 'var(--accent-primary)' : 'var(--surface-card)',
@@ -184,12 +191,14 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
           {/* Generation selector - visible in BOTH modes */}
           <div className="space-y-2">
             <label
-              className="text-xs font-semibold tracking-wide uppercase"
+              htmlFor="generation-select"
+              className="font-semibold text-xs uppercase tracking-wide"
               style={{ color: 'var(--text-tertiary)' }}
             >
               {collectionType === 'generation' ? 'Region Era' : 'Source Generation'}
             </label>
             <select
+              id="generation-select"
               value={selectedGenId}
               onChange={e => onGenChange(Number(e.target.value))}
               className="select h-14"
@@ -204,21 +213,22 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
 
           {/* Variant category selector - only in variant mode */}
           {collectionType === 'variants' && (
-            <div className="space-y-2 lg:col-span-2">
-              <label
-                className="text-xs font-semibold tracking-wide uppercase"
+            <fieldset className="m-0 min-w-0 space-y-2 border-0 p-0 lg:col-span-2">
+              <legend
+                className="mb-2 block p-0 font-semibold text-xs uppercase tracking-wide"
                 style={{ color: 'var(--text-tertiary)' }}
               >
                 Variant Types
-              </label>
+              </legend>
               <div className="flex flex-wrap gap-2">
                 {VARIANT_CATEGORY_CONFIG.map(({ id, label, icon: Icon, color }) => {
                   const isSelected = selectedVariantCategories.includes(id);
                   return (
                     <button
+                      type="button"
                       key={id}
                       onClick={() => onToggleVariantCategory(id)}
-                      className="flex items-center gap-1.5 rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all"
+                      className="flex items-center gap-1.5 rounded-lg border-2 px-3 py-2 font-medium text-sm transition-all"
                       style={{
                         background: isSelected ? color : 'var(--surface-card)',
                         borderColor: isSelected ? color : 'var(--border-primary)',
@@ -231,18 +241,20 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
                   );
                 })}
               </div>
-            </div>
+            </fieldset>
           )}
 
           {mode !== WorkflowMode.SUMMARY_ONLY && (
             <div className="space-y-2">
               <label
-                className="text-xs font-semibold tracking-wide uppercase"
+                htmlFor="voice-select"
+                className="font-semibold text-xs uppercase tracking-wide"
                 style={{ color: 'var(--text-tertiary)' }}
               >
                 Voice Profile
               </label>
               <select
+                id="voice-select"
                 value={selectedVoice}
                 onChange={e => onVoiceChange(e.target.value)}
                 className="select h-14"
@@ -261,15 +273,17 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
             <>
               <div className="space-y-2">
                 <label
-                  className="text-xs font-semibold tracking-wide uppercase"
+                  htmlFor="range-start-input"
+                  className="font-semibold text-xs uppercase tracking-wide"
                   style={{ color: 'var(--text-tertiary)' }}
                 >
                   Start ID
                 </label>
                 <input
+                  id="range-start-input"
                   type="number"
                   value={rangeStart}
-                  onChange={e => onRangeChange(parseInt(e.target.value) || 1, rangeEnd)}
+                  onChange={e => onRangeChange(parseInt(e.target.value, 10) || 1, rangeEnd)}
                   disabled={selectedIds.size > 0}
                   className="input h-14 disabled:opacity-50"
                 />
@@ -277,15 +291,17 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
 
               <div className="space-y-2">
                 <label
-                  className="text-xs font-semibold tracking-wide uppercase"
+                  htmlFor="range-end-input"
+                  className="font-semibold text-xs uppercase tracking-wide"
                   style={{ color: 'var(--text-tertiary)' }}
                 >
                   End ID
                 </label>
                 <input
+                  id="range-end-input"
                   type="number"
                   value={rangeEnd}
-                  onChange={e => onRangeChange(rangeStart, parseInt(e.target.value) || 1)}
+                  onChange={e => onRangeChange(rangeStart, parseInt(e.target.value, 10) || 1)}
                   disabled={selectedIds.size > 0}
                   className="input h-14 disabled:opacity-50"
                 />
@@ -297,12 +313,14 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
         <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-end">
           <div className="flex-1 space-y-2">
             <label
-              className="text-xs font-semibold tracking-wide uppercase"
+              htmlFor="pokemon-search"
+              className="font-semibold text-xs uppercase tracking-wide"
               style={{ color: 'var(--text-tertiary)' }}
             >
               Search
             </label>
             <input
+              id="pokemon-search"
               type="text"
               value={searchQuery}
               onChange={e => onSearchChange(e.target.value)}
@@ -311,7 +329,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
             />
           </div>
 
-          <button onClick={onStartProcess} className="btn btn-primary h-14 px-8">
+          <button type="button" onClick={onStartProcess} className="btn btn-primary h-14 px-8">
             {selectedIds.size > 0 ? `${getModeLabel()} (${selectedIds.size})` : getModeLabel()}
           </button>
         </div>
@@ -326,12 +344,15 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
             }}
           >
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-semibold" style={{ color: 'var(--accent-primary)' }}>
+              <span className="font-semibold text-xs" style={{ color: 'var(--accent-primary)' }}>
                 {selectedIds.size} selected
               </span>
               <button
-                onClick={() => selectedIds.forEach(id => onToggleSelection(id))}
-                className="text-xs font-medium transition-colors"
+                type="button"
+                onClick={() => {
+                  for (const id of selectedIds) onToggleSelection(id);
+                }}
+                className="font-medium text-xs transition-colors"
                 style={{ color: 'var(--text-tertiary)' }}
               >
                 Clear All
@@ -341,14 +362,15 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
               {(Array.from(selectedIds) as number[])
                 .sort((a, b) => a - b)
                 .map(id => (
-                  <span
+                  <button
+                    type="button"
                     key={id}
                     onClick={() => onToggleSelection(id)}
-                    className="cursor-pointer rounded px-2.5 py-1 text-xs font-medium shadow-sm transition-colors"
+                    className="cursor-pointer rounded px-2.5 py-1 font-medium text-xs shadow-sm transition-colors"
                     style={{ background: 'var(--surface-card)', color: 'var(--text-secondary)' }}
                   >
                     #{id}
-                  </span>
+                  </button>
                 ))}
             </div>
           </div>
@@ -358,9 +380,9 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
       {/* Pokemon Grid */}
       <div className="grid grid-cols-3 gap-2.5 md:grid-cols-5 lg:grid-cols-8">
         {isLoading
-          ? Array.from({ length: 24 }).map((_, i) => (
+          ? SKELETON_KEYS.map(key => (
               <div
-                key={i}
+                key={key}
                 className="h-20 animate-pulse rounded-lg border-2"
                 style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
               />
@@ -372,18 +394,20 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
               const isVariant = !p.isDefault;
 
               return (
-                <div
+                <button
+                  type="button"
                   key={p.id}
                   onClick={() => onToggleSelection(p.id)}
-                  className="group relative cursor-pointer rounded-lg border-2 px-3.5 py-2 transition-all hover:shadow-md"
+                  aria-pressed={isSelected}
+                  className="group relative w-full cursor-pointer rounded-lg border-2 px-3.5 py-2 text-left transition-all hover:shadow-md"
                   style={{
                     background: isSelected ? 'var(--bg-secondary)' : 'var(--surface-card)',
                     borderColor: isSelected ? 'var(--accent-primary)' : 'var(--border-primary)',
                   }}
                 >
-                  <div className="absolute top-2 right-2 flex gap-1">
+                  <span className="absolute top-2 right-2 flex gap-1">
                     {hasSavedSummary && (
-                      <div
+                      <span
                         className="h-1.5 w-1.5 rounded-full"
                         style={{ background: 'var(--accent-secondary)' }}
                         title="Summary saved"
@@ -394,13 +418,13 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
                         <Volume2 className="h-3 w-3" style={{ color: '#d97706' }} />
                       </span>
                     )}
-                  </div>
+                  </span>
 
                   {/* Variant badge - positioned bottom right */}
                   {isVariant && (
-                    <div className="mb-0.5">
+                    <span className="mb-0.5 block">
                       <span
-                        className="rounded px-1.5 py-0.5 text-[8px] font-bold uppercase"
+                        className="rounded px-1.5 py-0.5 font-bold text-[8px] uppercase"
                         style={getVariantBadgeStyle(p.variantCategory)}
                         title={p.variantCategory}
                       >
@@ -409,11 +433,11 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
                         {p.variantCategory === 'gmax' && 'G'}
                         {p.variantCategory === 'other' && '•'}
                       </span>
-                    </div>
+                    </span>
                   )}
 
                   <span
-                    className="text-[9px] font-semibold tracking-wide"
+                    className="font-semibold text-[9px] tracking-wide"
                     style={{
                       color: isSelected ? 'var(--accent-primary)' : 'var(--text-tertiary)',
                       display: 'block',
@@ -421,14 +445,14 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
                   >
                     #{formatPokemonId(isVariant ? p.speciesId : p.id)}
                   </span>
-                  <h4
-                    className="mt-1 truncate text-xs font-medium"
+                  <span
+                    className="mt-1 block truncate font-medium text-xs"
                     style={{ color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)' }}
                     title={p.displayName}
                   >
                     {p.displayName}
-                  </h4>
-                </div>
+                  </span>
+                </button>
               );
             })}
       </div>
@@ -440,7 +464,7 @@ export const GenerationView: React.FC<GenerationViewProps> = ({
           style={{ background: 'var(--surface-card)', borderColor: 'var(--border-primary)' }}
         >
           <Sparkles className="mx-auto mb-4 h-12 w-12" style={{ color: 'var(--text-tertiary)' }} />
-          <h3 className="mb-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="mb-2 font-semibold text-lg" style={{ color: 'var(--text-primary)' }}>
             Select Variant Types
           </h3>
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
