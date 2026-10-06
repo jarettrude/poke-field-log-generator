@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { CooldownState } from '../types';
-import { POKEBALL_IMAGE, getRandomFlavorText } from '../constants';
+import type React from 'react';
+import { useEffect, useState } from 'react';
+import { getRandomFlavorText, POKEBALL_IMAGE } from '../constants';
+import type { CooldownState } from '../types';
 
 interface ProcessingOverlayProps {
   progress: {
@@ -75,7 +76,7 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
 
         {/* Current Pokemon Name */}
         {progress.currentPokemonName && !cooldown?.active && (
-          <div className="text-lg font-bold capitalize" style={{ color: 'var(--text-primary)' }}>
+          <div className="font-bold text-lg capitalize" style={{ color: 'var(--text-primary)' }}>
             #{progress.currentPokemonId?.toString().padStart(3, '0')} {progress.currentPokemonName}
           </div>
         )}
@@ -90,13 +91,13 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
               className={`h-2 w-2 rounded-full ${isPaused ? '' : 'animate-pulse'}`}
               style={{ background: isPaused ? '#d97706' : 'var(--accent-secondary)' }}
             />
-            <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+            <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
               {progress.stage === 'summary' ? 'Generating Summaries' : 'Synthesizing Audio'}
             </span>
           </div>
 
           <h2
-            className="min-h-8 text-lg font-bold sm:text-2xl"
+            className="min-h-8 font-bold text-lg sm:text-2xl"
             style={{ color: 'var(--text-primary)' }}
           >
             {isPaused ? 'Paused' : cooldown?.active ? 'Cooling down…' : progress.message}
@@ -109,14 +110,14 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
               style={{ borderColor: '#d97706' }}
             >
               <div className="mb-3 flex items-center justify-between">
-                <span className="text-sm font-bold" style={{ color: '#d97706' }}>
+                <span className="font-bold text-sm" style={{ color: '#d97706' }}>
                   Cooldown
                 </span>
-                <span className="text-2xl font-bold" style={{ color: '#b45309' }}>
+                <span className="font-bold text-2xl" style={{ color: '#b45309' }}>
                   {formatTime(cooldown.remainingMs)}
                 </span>
               </div>
-              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+              <p className="font-medium text-sm" style={{ color: 'var(--text-secondary)' }}>
                 {flavorText}
               </p>
             </div>
@@ -138,7 +139,7 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
               }}
             />
           </div>
-          <div className="flex justify-between text-sm font-semibold">
+          <div className="flex justify-between font-semibold text-sm">
             <span style={{ color: 'var(--text-secondary)' }}>Progress</span>
             <span style={{ color: 'var(--text-primary)' }}>
               {progress.current} / {progress.total}
@@ -148,10 +149,14 @@ export const ProcessingOverlay: React.FC<ProcessingOverlayProps> = ({
 
         {/* Controls */}
         <div className="flex justify-center gap-3 sm:gap-4">
-          <button onClick={isPaused ? onResume : onPause} className="btn btn-secondary">
+          <button
+            type="button"
+            onClick={isPaused ? onResume : onPause}
+            className="btn btn-secondary"
+          >
             {isPaused ? 'Resume' : 'Pause'}
           </button>
-          <button onClick={onCancel} className="btn btn-outline">
+          <button type="button" onClick={onCancel} className="btn btn-outline">
             Cancel
           </button>
         </div>

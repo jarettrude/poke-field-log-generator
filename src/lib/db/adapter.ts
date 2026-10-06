@@ -3,7 +3,7 @@
  * Defines the contract for database implementations (SQLite/MySQL).
  */
 
-import { VariantCategory } from '../../types';
+import type { VariantCategory } from '../../types';
 
 export interface StoredSummary {
   id: number;

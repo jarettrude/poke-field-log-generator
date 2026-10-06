@@ -1,23 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-
-import { createJob, pauseJob, resumeJob, cancelJob } from '@/services/jobsService';
-
 import {
-  Header,
   GenerationView,
+  Header,
   ProcessingOverlay,
   ResultsView,
+  ThemeProvider,
   ToastProvider,
   useToast,
-  ThemeProvider,
 } from '@/components';
-
-import { ProcessedPokemon, WorkflowMode } from '@/types';
 import { useJobStream } from '@/hooks/useJobStream';
 import { usePokemonData } from '@/hooks/usePokemonData';
 import { useSavedData } from '@/hooks/useSavedData';
+import { cancelJob, createJob, pauseJob, resumeJob } from '@/services/jobsService';
+import { type ProcessedPokemon, WorkflowMode } from '@/types';
 
 type GeneratorView = 'select' | 'processing' | 'results';
 
@@ -244,7 +241,7 @@ function GeneratorPageInner() {
         className="border-t-2 py-8 text-center backdrop-blur"
         style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-elevated)' }}
       >
-        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+        <p className="font-medium text-sm" style={{ color: 'var(--text-secondary)' }}>
           Field Logs Generator &middot; Powered by Gemini AI
         </p>
       </footer>

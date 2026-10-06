@@ -1,6 +1,6 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { getDatabase } from '@/lib/db/adapter';
-import { successResponse, errorResponse } from '@/lib/server/api';
+import { errorResponse, successResponse } from '@/lib/server/api';
 
 export const runtime = 'nodejs';
 

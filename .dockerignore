@@ -31,6 +31,10 @@ npm-debug.log*
 # Testing
 coverage
 
+# Runtime data (mounted as volumes at run time, not baked into the image)
+data
+public/pokemon
+
 # Docker
 Dockerfile
 docker-compose.yml

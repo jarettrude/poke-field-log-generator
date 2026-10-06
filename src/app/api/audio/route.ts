@@ -1,5 +1,5 @@
 import { getDatabase } from '@/lib/db/adapter';
-import { successResponse, errorResponse } from '@/lib/server/api';
+import { errorResponse, successResponse } from '@/lib/server/api';
 
 export const runtime = 'nodejs';
 
@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
     // Use metadata-only methods to avoid JSON serialization issues with large audio data
     const audioLogs = generationIdParam
-      ? await db.getAudioLogsMetadataByGeneration(parseInt(generationIdParam))
+      ? await db.getAudioLogsMetadataByGeneration(parseInt(generationIdParam, 10))
       : await db.getAllAudioLogsMetadata();
 
     return successResponse(audioLogs);

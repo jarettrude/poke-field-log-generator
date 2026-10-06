@@ -3,21 +3,21 @@
  * Implement when ready to switch to MySQL
  */
 
-import {
-  DatabaseAdapter,
-  StoredSummary,
-  CachedPokemon,
-  SummaryInput,
-  PokemonInput,
-  StoredAudioLog,
-  AudioLogMetadata,
+import type {
   AudioLogInput,
-  StoredPrompt,
-  PromptInput,
+  AudioLogMetadata,
+  CachedPokemon,
   CreateJobInput,
-  ProcessingJob,
+  DatabaseAdapter,
   JobStatus,
+  PokemonInput,
+  ProcessingJob,
   ProcessingStage,
+  PromptInput,
+  StoredAudioLog,
+  StoredPrompt,
+  StoredSummary,
+  SummaryInput,
 } from './adapter';
 
 export class MySQLAdapter implements DatabaseAdapter {

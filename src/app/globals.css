@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* Field Researcher Journal Theme - Inspired by nature expeditions and classic Pokedex */
 @theme {
@@ -128,8 +128,8 @@
 
 /* Dark Mode - Night Forest & Expedition Camp */
 /* Applied via data-theme attribute OR system preference */
-[data-theme='dark'],
-:root:has([data-theme='dark']) {
+[data-theme="dark"],
+:root:has([data-theme="dark"]) {
   --bg-primary: #1c1f19;
   --bg-secondary: #282d24;
   --bg-tertiary: #343a30;
@@ -162,7 +162,7 @@
 
 /* System preference fallback when no data-theme is set */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme="light"]) {
     --bg-primary: #1c1f19;
     --bg-secondary: #282d24;
     --bg-tertiary: #343a30;
@@ -200,13 +200,7 @@
 }
 
 body {
-  font-family:
-    'Inter',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;

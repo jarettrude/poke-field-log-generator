@@ -1,8 +1,8 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { getDatabase } from '@/lib/db/adapter';
-import fs from 'fs/promises';
-import path from 'path';
-import { successResponse, errorResponse, parseId } from '@/lib/server/api';
-import { VariantCategory } from '@/types';
+import { errorResponse, parseId, successResponse } from '@/lib/server/api';
+import type { VariantCategory } from '@/types';
 
 export const runtime = 'nodejs';
 

@@ -10,8 +10,8 @@
  */
 
 import { getDatabase } from '@/lib/db/adapter';
-import { jobEvents } from '@/lib/server/jobEvents';
 import type { JobEvent } from '@/lib/server/jobEvents';
+import { jobEvents } from '@/lib/server/jobEvents';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

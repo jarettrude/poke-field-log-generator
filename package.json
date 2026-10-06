@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "node .next/standalone/server.js",
-    "lint": "biome lint src/",
+    "lint": "biome check src/",
     "lint:fix": "biome check --write --unsafe src/",
     "type-check": "tsc --noEmit",
     "format": "biome format --write src/",

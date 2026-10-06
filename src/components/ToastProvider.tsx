@@ -1,7 +1,8 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, Info, TriangleAlert, XCircle, X } from 'lucide-react';
+import { CheckCircle2, Info, TriangleAlert, X, XCircle } from 'lucide-react';
+import type React from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 
 type ToastVariant = 'success' | 'info' | 'warning' | 'error';
 
@@ -54,7 +55,6 @@ const stylesForVariant = (variant: ToastVariant) => {
         desc: 'text-rose-800/80',
         close: 'text-rose-800/70 hover:text-rose-900',
       };
-    case 'info':
     default:
       return {
         container: 'border-slate-200 bg-white',
@@ -138,12 +138,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className={`text-sm font-semibold ${s.title}`}>{t.title}</div>
+                  <div className={`font-semibold text-sm ${s.title}`}>{t.title}</div>
                   {t.description && (
                     <div className={`mt-0.5 text-sm ${s.desc}`}>{t.description}</div>
                   )}
                 </div>
                 <button
+                  type="button"
                   onClick={() => dismissToast(t.id)}
                   className={`-mt-1 -mr-1 rounded-md p-1 transition-colors ${s.close}`}
                   aria-label="Dismiss"

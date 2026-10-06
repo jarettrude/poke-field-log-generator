@@ -5,7 +5,7 @@
 
 'use client';
 
-import { Header, HomeView, ToastProvider, ThemeProvider } from '@/components';
+import { Header, HomeView, ThemeProvider, ToastProvider } from '@/components';
 import { useSavedData } from '@/hooks/useSavedData';
 
 function HomePageInner() {
@@ -23,7 +23,7 @@ function HomePageInner() {
         className="border-t-2 py-8 text-center backdrop-blur"
         style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-elevated)' }}
       >
-        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+        <p className="font-medium text-sm" style={{ color: 'var(--text-secondary)' }}>
           Field Logs Generator &middot; Powered by Gemini AI
         </p>
       </footer>

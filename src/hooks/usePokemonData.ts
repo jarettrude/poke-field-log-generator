@@ -3,14 +3,14 @@
  * Handles fetching generations, Pokemon lists, and variant categories with caching.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchGenerations,
-  fetchPokemonInGeneration,
   fetchGenerationWithRegion,
+  fetchPokemonInGeneration,
   fetchVariantsByCategory,
 } from '@/services/pokeService';
-import { Generation, PokemonBaseInfo, CollectionType, VariantCategory } from '@/types';
+import type { CollectionType, Generation, PokemonBaseInfo, VariantCategory } from '@/types';
 
 export function usePokemonData() {
   const [generations, setGenerations] = useState<Generation[]>([]);

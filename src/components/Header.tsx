@@ -5,21 +5,22 @@
 
 'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import {
-  Home,
-  BookOpen,
-  Settings,
   BookMarked,
-  Sun,
-  Moon,
-  Monitor,
-  Wand2,
+  BookOpen,
+  Home,
   Menu,
+  Monitor,
+  Moon,
+  Settings,
+  Sun,
+  Wand2,
   X,
 } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import type React from 'react';
+import { useState } from 'react';
 import { useTheme } from './ThemeProvider';
 
 export const Header: React.FC = () => {
@@ -62,10 +63,10 @@ export const Header: React.FC = () => {
             <BookMarked className="h-6 w-6" style={{ color: 'var(--text-inverse)' }} />
           </div>
           <div className="hidden md:block">
-            <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            <h1 className="font-bold text-xl" style={{ color: 'var(--text-primary)' }}>
               Field Logs
             </h1>
-            <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+            <p className="font-medium text-xs" style={{ color: 'var(--text-secondary)' }}>
               Pokédex Research System
             </p>
           </div>
@@ -88,16 +89,27 @@ export const Header: React.FC = () => {
 
           <div className="mx-2 h-6 w-px" style={{ background: 'var(--border-secondary)' }} />
 
-          <button onClick={cycleTheme} className="btn btn-ghost" title={`Theme: ${theme}`}>
+          <button
+            type="button"
+            onClick={cycleTheme}
+            className="btn btn-ghost"
+            title={`Theme: ${theme}`}
+          >
             <ThemeIcon className="h-4 w-4" />
           </button>
         </nav>
 
         <div className="flex items-center gap-2 md:hidden">
-          <button onClick={cycleTheme} className="btn btn-ghost" title={`Theme: ${theme}`}>
+          <button
+            type="button"
+            onClick={cycleTheme}
+            className="btn btn-ghost"
+            title={`Theme: ${theme}`}
+          >
             <ThemeIcon className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="btn btn-ghost"
             aria-label="Toggle menu"

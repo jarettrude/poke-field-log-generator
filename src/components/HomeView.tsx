@@ -3,9 +3,9 @@
  * Shows navigation options for generator and library with summary counts.
  */
 
-import React from 'react';
+import { ArrowRight, BookOpen, Wand2 } from 'lucide-react';
 import Link from 'next/link';
-import { Wand2, BookOpen, ArrowRight } from 'lucide-react';
+import type React from 'react';
 
 interface HomeViewProps {
   summaryCount: number;
@@ -15,7 +15,7 @@ interface HomeViewProps {
 export const HomeView: React.FC<HomeViewProps> = ({ summaryCount, audioCount }) => {
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
-      <h2 className="mb-3 text-center text-4xl font-bold" style={{ color: 'var(--text-primary)' }}>
+      <h2 className="mb-3 text-center font-bold text-4xl" style={{ color: 'var(--text-primary)' }}>
         Pokédex Field Logs
       </h2>
       <p
@@ -37,7 +37,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ summaryCount, audioCount }) 
           >
             <Wand2 className="h-7 w-7" />
           </div>
-          <h3 className="mb-2 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="mb-2 font-bold text-xl" style={{ color: 'var(--text-primary)' }}>
             Generate New Logs
           </h3>
           <p className="mb-4 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
@@ -45,7 +45,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ summaryCount, audioCount }) 
             modes.
           </p>
           <span
-            className="inline-flex items-center gap-2 text-sm font-semibold"
+            className="inline-flex items-center gap-2 font-semibold text-sm"
             style={{ color: 'var(--accent-primary)' }}
           >
             Start generating <ArrowRight className="h-4 w-4" />
@@ -63,14 +63,14 @@ export const HomeView: React.FC<HomeViewProps> = ({ summaryCount, audioCount }) 
           >
             <BookOpen className="h-7 w-7" />
           </div>
-          <h3 className="mb-2 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          <h3 className="mb-2 font-bold text-xl" style={{ color: 'var(--text-primary)' }}>
             View Library
           </h3>
           <p className="mb-4 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             Browse, play, and download your saved field logs. Manage your Pokédex collection.
           </p>
           <span
-            className="inline-flex items-center gap-2 text-sm font-semibold"
+            className="inline-flex items-center gap-2 font-semibold text-sm"
             style={{ color: 'var(--accent-secondary)' }}
           >
             Open library <ArrowRight className="h-4 w-4" />

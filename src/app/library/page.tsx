@@ -1,20 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { deleteSummaries, deleteAudioLogs } from '@/services/storageService';
-import { createJob, pauseJob, resumeJob, cancelJob } from '@/services/jobsService';
 import {
   Header,
   PokedexLibraryView,
   ProcessingOverlay,
   ResultsView,
+  ThemeProvider,
   ToastProvider,
   useToast,
-  ThemeProvider,
 } from '@/components';
-import { ProcessedPokemon } from '@/types';
-import { useSavedData } from '@/hooks/useSavedData';
 import { useJobStream } from '@/hooks/useJobStream';
+import { useSavedData } from '@/hooks/useSavedData';
+import { cancelJob, createJob, pauseJob, resumeJob } from '@/services/jobsService';
+import { deleteAudioLogs, deleteSummaries } from '@/services/storageService';
+import type { ProcessedPokemon } from '@/types';
 
 type LibraryView = 'library' | 'results';
 
@@ -180,7 +180,7 @@ function LibraryPageInner() {
         className="border-t-2 py-8 text-center backdrop-blur"
         style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-elevated)' }}
       >
-        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+        <p className="font-medium text-sm" style={{ color: 'var(--text-secondary)' }}>
           Field Logs Generator &middot; Powered by Gemini AI
         </p>
       </footer>
