@@ -3,8 +3,12 @@
  *
  * Models (as of Oct 2026):
  *
- * gemini-3.8-flash (text generation):
- *   - Current stable Flash model; free tier eligible
+ * Summary text generation cascades through:
+ *   gemini-3.8-flash → gemini-3.7-flash → gemini-3.6-flash →
+ *   gemini-3.5-flash → gemini-2.5-flash
+ *   Each model has an independent quota pool, so persistent 503 overload
+ *   or daily-quota exhaustion on one model falls through to the next.
+ *   A model marked exhausted is skipped for the rest of the batch.
  *
  * gemini-3.8-flash-tts (audio generation - primary):
  *   - Flagship TTS; free tier eligible

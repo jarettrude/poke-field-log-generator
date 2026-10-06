@@ -2,7 +2,8 @@
  * Server-side Gemini AI client for summary generation and text-to-speech.
  *
  * Models (as of Oct 2026):
- * - gemini-3.8-flash: summary generation (stable, free tier eligible)
+ * - Summaries: cascades gemini-3.8 → 3.7 → 3.6 → 3.5 → 2.5 flash models;
+ *   each has its own quota pool so a saturated model falls through
  * - gemini-3.8-flash-tts: primary TTS (stable, free tier eligible)
  * - gemini-3.8-flash-lite-tts: fallback TTS (stable, free tier eligible)
  *
@@ -17,6 +18,7 @@ import { getActivePrompt } from './prompts';
 
 const MAX_RETRIES = 4;
 const MAX_RETRIES_TTS = 1;
+const MAX_RETRIES_SUMMARY = 1;
 
 const BACKOFF_BASE_MS = 1000;
 const BACKOFF_MAX_MS = 64000;
@@ -31,16 +33,27 @@ const RATE_LIMIT_MAX_MS = 120000;
 // is maxed out. Each new batch should call resetBatchQuotaState().
 
 interface BatchQuotaState {
+  summaryExhausted: Set<string>;
   primaryExhausted: boolean;
   fallbackExhausted: boolean;
 }
 
 const batchQuota: BatchQuotaState = {
+  summaryExhausted: new Set(),
   primaryExhausted: false,
   fallbackExhausted: false,
 };
 
-const SUMMARY_MODEL = 'gemini-3.8-flash';
+// Cascading fallback for summary generation. Each model has its own quota
+// pool, so a saturated model can be skipped mid-batch for an older one.
+// Ordered newest → oldest; all are free-tier eligible text models.
+const SUMMARY_MODELS = [
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash',
+] as const;
 const TTS_PRIMARY_MODEL = 'gemini-3.8-flash-tts';
 const TTS_FALLBACK_MODEL = 'gemini-3.8-flash-lite-tts';
 
@@ -48,6 +61,7 @@ const TTS_FALLBACK_MODEL = 'gemini-3.8-flash-lite-tts';
  * Reset batch quota state. Call at the start of every new batch.
  */
 export function resetBatchQuotaState(): void {
+  batchQuota.summaryExhausted.clear();
   batchQuota.primaryExhausted = false;
   batchQuota.fallbackExhausted = false;
 }
@@ -173,11 +187,10 @@ function getClient(): GoogleGenAI {
  * Generate a field-log summary for a Pokémon using Gemini.
  */
 export async function generateSummary(details: PokemonDetails, region: string): Promise<string> {
-  return withRetry(async () => {
-    const ai = getClient();
-    const systemPrompt = await getActivePrompt('summary');
+  const ai = getClient();
+  const systemPrompt = await getActivePrompt('summary');
 
-    const pokemonContext = `
+  const pokemonContext = `
     ---
     ID: ${details.id}
     Name: ${details.name}
@@ -189,10 +202,11 @@ export async function generateSummary(details: PokemonDetails, region: string): 
     Available Moves: ${details.allMoveNames.slice(0, 30).join(', ')}
   `;
 
-    const prompt = `${systemPrompt}\n\nPOKEMON DATA:\n${pokemonContext}`;
+  const prompt = `${systemPrompt}\n\nPOKEMON DATA:\n${pokemonContext}`;
 
+  const makeSummaryRequest = async (model: string): Promise<string> => {
     const response = await ai.models.generateContent({
-      model: SUMMARY_MODEL,
+      model,
       contents: prompt,
       config: {
         temperature: 0.85,
@@ -228,7 +242,35 @@ export async function generateSummary(details: PokemonDetails, region: string): 
     }
 
     return parsed.summary;
-  }, MAX_RETRIES);
+  };
+
+  // Try each model in cascade order. Daily quota exhaustion and persistent
+  // unavailability (e.g. sustained 503 overload) mark the model for the rest
+  // of the batch so we stop wasting calls on it. Non-retryable errors
+  // (bad request, auth) fail fast — every model would reject the same input.
+  let lastError: unknown;
+  for (const model of SUMMARY_MODELS) {
+    if (batchQuota.summaryExhausted.has(model)) {
+      console.log(`Skipping ${model} (unavailable earlier in this batch).`);
+      continue;
+    }
+
+    try {
+      return await withRetry(() => makeSummaryRequest(model), MAX_RETRIES_SUMMARY);
+    } catch (error) {
+      lastError = error;
+      if (isDailyQuotaExhausted(error)) {
+        console.warn(`${model} daily quota exhausted. Trying next model in cascade...`);
+      } else if (isRetryableError(error)) {
+        console.warn(`${model} still unavailable after retries. Trying next model in cascade...`);
+      } else {
+        throw error;
+      }
+      batchQuota.summaryExhausted.add(model);
+    }
+  }
+
+  throw lastError ?? new Error('All summary models exhausted.');
 }
 
 /**

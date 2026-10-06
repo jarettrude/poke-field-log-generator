@@ -265,13 +265,15 @@ The application uses Google's Gemini AI for both text generation and text-to-spe
 
 ### Text Generation
 
-**Model:** gemini-3.8-flash
+**Model cascade:** `gemini-3.8-flash` → `gemini-3.7-flash` → `gemini-3.6-flash` → `gemini-3.5-flash` → `gemini-2.5-flash`
+
+Each model has an independent quota pool. Persistent overload (503) or daily-quota exhaustion on one model marks it for the rest of the batch and falls through to the next.
 
 **Configuration:**
 
 - Temperature: 0.85
 - Structured JSON output via response schema
-- Retry with exponential backoff (up to 4 retries)
+- One retry per model before cascading to the next
 
 **Prompt Structure:**
 
