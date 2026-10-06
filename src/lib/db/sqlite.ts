@@ -9,6 +9,7 @@ import type {
   AudioLogInput,
   AudioLogMetadata,
   CachedPokemon,
+  CachedPokemonMedia,
   CreateJobInput,
   DatabaseAdapter,
   JobStatus,
@@ -75,6 +76,15 @@ export class SQLiteAdapter implements DatabaseAdapter {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
+    `);
+
+    // Covering index for metadata list queries: audio_base64 blobs make the
+    // table ~GBs, and without this index a metadata-only SELECT still scans
+    // leaf pages scattered among blob overflow pages. The index lets the
+    // query be served entirely from compact index pages.
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_audio_logs_metadata
+      ON audio_logs (id, name, region, generation_id, voice, audio_format, bitrate, created_at, updated_at)
     `);
 
     // Create pokemon cache table
@@ -401,6 +411,21 @@ export class SQLiteAdapter implements DatabaseAdapter {
     const rows = stmt.all() as DatabaseRow[];
 
     return rows.map(this.mapRowToPokemon);
+  }
+
+  async getAllCachedPokemonMedia(): Promise<CachedPokemonMedia[]> {
+    const stmt = this.db.prepare(
+      'SELECT id, image_png_path, image_svg_path, generation_id, region FROM pokemon_cache ORDER BY id'
+    );
+    const rows = stmt.all() as DatabaseRow[];
+
+    return rows.map(row => ({
+      id: row.id as number,
+      imagePngPath: row.image_png_path as string | null,
+      imageSvgPath: row.image_svg_path as string | null,
+      generationId: row.generation_id as number,
+      region: row.region as string,
+    }));
   }
 
   // Prompt operations

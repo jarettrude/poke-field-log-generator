@@ -158,6 +158,9 @@ const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId, transcript
   );
 };
 
+/** Number of library cards revealed per scroll batch. */
+const LIBRARY_PAGE_SIZE = 60;
+
 interface CachedPokemonData {
   id: number;
   imagePngPath?: string | null;
@@ -221,49 +224,40 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   }, []);
 
   useEffect(() => {
+    const fallbackArtwork = (id: number): CachedPokemonData => ({
+      id,
+      imagePngPath: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
+      imageSvgPath: null,
+    });
+
     const fetchPokemonData = async () => {
       const allIds = new Set([...summaries.map(s => s.id), ...audioLogs.map(a => a.id)]);
       const newCache = new Map<number, CachedPokemonData>();
 
-      for (const id of allIds) {
-        try {
-          const res = await fetch(`/api/pokemon/${id}`);
-          if (res.ok) {
-            const response = await res.json();
-            const data = response.data;
-            if (data) {
-              newCache.set(id, {
-                id,
-                imagePngPath:
-                  data.imagePngPath ||
-                  `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
-                imageSvgPath: data.imageSvgPath,
-                generationId: data.generationId,
-                region: data.region,
-              });
-            } else {
-              // No cached data, use fallbacks
-              newCache.set(id, {
-                id,
-                imagePngPath: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
-                imageSvgPath: null,
-              });
-            }
-          } else {
-            // API returned error, use fallback
-            newCache.set(id, {
-              id,
-              imagePngPath: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
-              imageSvgPath: null,
+      try {
+        const res = await fetch('/api/pokemon');
+        if (res.ok) {
+          const response = (await res.json()) as {
+            success: boolean;
+            data?: CachedPokemonData[];
+          };
+          for (const row of response.data ?? []) {
+            newCache.set(row.id, {
+              ...row,
+              imagePngPath:
+                row.imagePngPath ||
+                `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${row.id}.png`,
             });
           }
-        } catch {
-          // Fetch failed, use fallback
-          newCache.set(id, {
-            id,
-            imagePngPath: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
-            imageSvgPath: null,
-          });
+        }
+      } catch {
+        // Fall through to per-id fallbacks below
+      }
+
+      // Entries missing from pokemon_cache still get the PokeAPI artwork fallback
+      for (const id of allIds) {
+        if (!newCache.has(id)) {
+          newCache.set(id, fallbackArtwork(id));
         }
       }
 
@@ -342,6 +336,38 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   }, [entries, generationFilter, regionFilter, contentFilter, searchQuery]);
 
   const filteredEntryIds = useMemo(() => filteredEntries.map(e => e.id), [filteredEntries]);
+
+  // Cards are revealed in batches as the sentinel scrolls into view, so a
+  // large library never mounts hundreds of DOM nodes at once.
+  const [visibleCount, setVisibleCount] = useState(LIBRARY_PAGE_SIZE);
+  const sentinelRef = React.useRef<HTMLDivElement | null>(null);
+  const hasMoreEntries = visibleCount < filteredEntries.length;
+
+  // Reset the revealed window whenever the filtered set changes. Adjusted
+  // during render (React re-renders immediately before commit) rather than
+  // in an effect, matching the range-normalization pattern below.
+  const [prevFilteredIds, setPrevFilteredIds] = useState(filteredEntryIds);
+  if (filteredEntryIds !== prevFilteredIds) {
+    setPrevFilteredIds(filteredEntryIds);
+    setVisibleCount(LIBRARY_PAGE_SIZE);
+  }
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMoreEntries) return;
+
+    const observer = new IntersectionObserver(
+      observed => {
+        if (observed.some(e => e.isIntersecting)) {
+          setVisibleCount(count => count + LIBRARY_PAGE_SIZE);
+        }
+      },
+      { rootMargin: '600px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreEntries]);
+
   const filteredIdBounds = useMemo(
     () => getIdBounds(filteredEntryIds),
     [filteredEntryIds, getIdBounds]
@@ -988,7 +1014,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredEntries.map(entry => {
+        {filteredEntries.slice(0, visibleCount).map(entry => {
           const isExpanded = expandedIds.has(entry.id);
           const isSelected = selectedIds.has(entry.id);
           const hasText = !!entry.summary;
@@ -1005,6 +1031,8 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
               style={{
                 background: 'var(--surface-card)',
                 borderColor: isSelected ? 'var(--accent-primary)' : 'var(--border-primary)',
+                contentVisibility: 'auto',
+                containIntrinsicSize: 'auto 420px',
               }}
             >
               <button
@@ -1202,6 +1230,17 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           );
         })}
       </div>
+
+      {hasMoreEntries && (
+        <div
+          ref={sentinelRef}
+          className="mt-8 flex items-center justify-center gap-2 text-sm"
+          style={{ color: 'var(--text-tertiary)' }}
+        >
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading {Math.min(visibleCount, filteredEntries.length)} of {filteredEntries.length}…
+        </div>
+      )}
 
       {filteredEntries.length === 0 && (
         <div

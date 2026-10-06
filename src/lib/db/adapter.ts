@@ -57,6 +57,15 @@ export interface CachedPokemon {
   cachedAt: string;
 }
 
+/** Slim pokemon_cache projection for library list rendering (media + classification only). */
+export interface CachedPokemonMedia {
+  id: number;
+  imagePngPath: string | null;
+  imageSvgPath: string | null;
+  generationId: number;
+  region: string;
+}
+
 export interface SummaryInput {
   id: number;
   name: string;
@@ -162,6 +171,7 @@ export interface DatabaseAdapter {
   cachePokemon(pokemon: PokemonInput): Promise<void>;
   getCachedPokemon(id: number): Promise<CachedPokemon | null>;
   getAllCachedPokemon(): Promise<CachedPokemon[]>;
+  getAllCachedPokemonMedia(): Promise<CachedPokemonMedia[]>;
 
   // Prompt operations
   savePrompt(prompt: PromptInput): Promise<void>;

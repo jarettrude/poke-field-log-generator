@@ -7,6 +7,7 @@ import type {
   AudioLogInput,
   AudioLogMetadata,
   CachedPokemon,
+  CachedPokemonMedia,
   CreateJobInput,
   DatabaseAdapter,
   JobStatus,
@@ -84,6 +85,10 @@ export class MySQLAdapter implements DatabaseAdapter {
   }
 
   async getAllCachedPokemon(): Promise<CachedPokemon[]> {
+    throw new Error('Not implemented');
+  }
+
+  async getAllCachedPokemonMedia(): Promise<CachedPokemonMedia[]> {
     throw new Error('Not implemented');
   }
 
