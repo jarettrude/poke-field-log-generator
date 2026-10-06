@@ -39,7 +39,7 @@ The Pokedex Field Log Generator creates authentic field researcher logs for Poke
    
    Sign up at [Google AI Studio](https://aistudio.google.com/) to obtain your API key.
    
-   **Important:** The default configuration uses `gemini-2.5-pro-preview-tts` which requires a **paid API key**. Free tier keys are limited to `gemini-2.5-flash-preview-tts` only (10 calls/day).
+   **Note:** The app uses `gemini-3.8-flash-tts` (primary) and `gemini-3.8-flash-lite-tts` (fallback) for audio and `gemini-3.8-flash` for text — all are available on the **free tier**. Per-model rate limits for your project are shown in AI Studio.
 
 2. **Clone the Repository**
    

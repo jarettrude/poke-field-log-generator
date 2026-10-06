@@ -265,7 +265,7 @@ The application uses Google's Gemini AI for both text generation and text-to-spe
 
 ### Text Generation
 
-**Model:** gemini-3-flash-preview
+**Model:** gemini-3.8-flash
 
 **Configuration:**
 
@@ -292,20 +292,27 @@ Available Moves: {moves}
 
 ### Text-to-Speech
 
-**Primary Model:** gemini-2.5-pro-preview-tts (50 RPD) - **Requires paid API key**
-**Fallback Model:** gemini-2.5-flash-preview-tts (10 RPD) - **Only 10 RPD available on free tier**
+**Primary Model:** gemini-3.8-flash-tts (flagship, studio-grade TTS)
+**Fallback Model:** gemini-3.8-flash-lite-tts (fast, high-volume TTS)
 
 **API Key Requirements:**
 
-- **Free Tier:** Only `gemini-2.5-flash-preview-tts` is available
-- **Paid Tier:** Required for `gemini-2.5-pro-preview-tts` access
-- **Note:** As of March 2026, the Pro TTS model remains in preview but requires billing setup
+- **Free Tier:** Both `gemini-3.8-flash-tts` and `gemini-3.8-flash-lite-tts` are free of charge on the Gemini API free tier
+- **Paid Tier:** Higher rate limits apply once billing is linked
+- **Note:** Per-model rate limits (RPM/RPD) are not published for the free tier — check your project's active limits in Google AI Studio
+- Requires `@google/genai` >= 2.24.0
+
+**Request shape (Gemini 3.8 TTS):**
+
+- Transcript is passed verbatim in `parts[].text`
+- The Director's Note prompt is passed as `parts[].speechMetadata.style` (delivery instructions are no longer embedded in the transcript text)
+- Voice is selected via `speechConfig.voiceConfig.voice` (accepts prebuilt names, Extended Voice Library IDs, or custom `voice_...` IDs)
 
 **Configuration:**
 
-- Output: PCM 16-bit signed little-endian at 24000 Hz, converted to MP3 (128 kbps) via ffmpeg
+- Output: `audio/wav` by default (24 kHz, mono, 16-bit); WAV is auto-detected via the RIFF header and converted to MP3 (128 kbps) via ffmpeg
 - Voice profiles: Kore, Zephyr, Charon, Puck, Fenrir
-- Strategy: Pro-first with Flash fallback. Max 4 API calls per Pokemon (1+1 retry on Pro, 1+1 retry on Flash)
+- Strategy: Flash TTS first with Flash-Lite TTS fallback. Max 4 API calls per Pokemon (1+1 retry per model)
 - Daily quota exhaustion triggers immediate fallback (no retries)
 
 **Batch-Level Quota Tracking:**
@@ -313,8 +320,8 @@ Available Moves: {moves}
 Within a single batch, once a model's daily quota is exhausted it is skipped for all remaining items. This avoids wasting API calls on a model known to be maxed out.
 
 - `resetBatchQuotaState()` is called at the start of every new audio batch
-- If Pro is exhausted mid-batch, all remaining items use Flash directly
-- If both Pro and Flash are exhausted, `TtsQuotaExhaustedError` is thrown
+- If the primary model is exhausted mid-batch, all remaining items use the fallback directly
+- If both models are exhausted, `TtsQuotaExhaustedError` is thrown
 - The job runner catches this error, saves partial progress, and displays a user-friendly message on the results page
 - Quotas reset at midnight Pacific Time
 
@@ -417,10 +424,10 @@ pnpm dev
 pnpm dev          # Start development server
 pnpm build        # Build for production
 pnpm start        # Start production server
-pnpm lint         # Run ESLint
-pnpm lint:fix     # Fix ESLint issues
+pnpm lint         # Run Biome linter
+pnpm lint:fix     # Fix Biome issues (includes unsafe fixes)
 pnpm type-check   # Run TypeScript type checking
-pnpm format       # Format code with Prettier
+pnpm format       # Format code with Biome
 pnpm format:check # Check code formatting
 pnpm check        # Run all checks (type-check, lint, format)
 pnpm fix          # Fix all auto-fixable issues
@@ -430,8 +437,7 @@ pnpm fix          # Fix all auto-fixable issues
 
 The project uses:
 
-- **ESLint** - Code linting with Next.js config
-- **Prettier** - Code formatting with Tailwind CSS plugin
+- **Biome** - Linting and formatting (replaces ESLint + Prettier), including Tailwind class sorting via `useSortedClasses`
 - **TypeScript** - Strict type checking
 
 ## Performance Considerations
