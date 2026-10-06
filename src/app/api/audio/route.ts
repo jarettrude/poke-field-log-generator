@@ -4,7 +4,7 @@ import { errorResponse, successResponse } from '@/lib/server/api';
 export const runtime = 'nodejs';
 
 // GET /api/audio - Get all audio logs metadata (optionally filter by generationId)
-// Returns metadata only (no audioBase64) to prevent RangeError on large datasets
+// Returns metadata only; MP3 bytes stream from /api/audio/[id]/file
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

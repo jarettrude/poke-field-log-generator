@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  getAudioLog,
+  getAudioFileUrl,
   getAudioLogsByGeneration,
   getSummariesByGeneration,
 } from '@/services/storageService';
@@ -181,11 +181,7 @@ export function useJobStream({
         const requiresAudio = params.mode !== 'SUMMARY_ONLY';
         if (requiresAudio && !hasAudio && !params.includePartial) continue;
 
-        let audioData = '';
-        if (hasAudio) {
-          const audio = await getAudioLog(id);
-          audioData = audio?.audioBase64 || '';
-        }
+        const audioUrl = hasAudio ? getAudioFileUrl(id) : '';
 
         const cachedPokemonRes = await fetch(`/api/pokemon/${id}`);
         const response = (await cachedPokemonRes.json().catch(() => null)) as {
@@ -205,7 +201,7 @@ export function useJobStream({
           name: summary.name,
           displayName: cachedPokemon?.displayName,
           summary: summary.summary,
-          audioData: audioData,
+          audioUrl,
           pngData: cachedPokemon?.imagePngPath || null,
           svgData: cachedPokemon?.imageSvgPath || null,
         });

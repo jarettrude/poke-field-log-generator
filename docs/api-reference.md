@@ -452,7 +452,7 @@ Manage generated audio narrations.
 
 #### Get All Audio Logs (Metadata)
 
-Retrieve metadata for all audio logs, optionally filtered by generation. The `audioBase64` field is excluded from list responses to prevent large payloads.
+Retrieve metadata for all audio logs, optionally filtered by generation. Audio bytes are not included in JSON responses; MP3 files stream from `GET /api/audio/{id}/file`.
 
 ```http
 GET /api/audio?generationId={number}
@@ -484,7 +484,7 @@ GET /api/audio?generationId={number}
 
 #### Get Audio Log
 
-Retrieve a specific audio log by Pokemon ID (includes full audio data).
+Retrieve a specific audio log by Pokemon ID. Returns metadata plus the path of the stored MP3 file; stream the audio itself via `GET /api/audio/{id}/file`.
 
 ```http
 GET /api/audio/{id}
@@ -500,7 +500,7 @@ GET /api/audio/{id}
     "region": "Kanto",
     "generationId": 1,
     "voice": "Kore",
-    "audioBase64": "base64-encoded-mp3-data...",
+    "audioPath": "audio/1.mp3",
     "audioFormat": "mp3",
     "bitrate": 128,
     "createdAt": "2025-01-15T12:00:00.000Z",
@@ -508,6 +508,17 @@ GET /api/audio/{id}
   }
 }
 ```
+
+#### Stream Audio File
+
+Stream the MP3 file for an audio log. Supports HTTP `Range` requests, so players can seek without downloading the whole clip.
+
+```http
+GET /api/audio/{id}/file
+Range: bytes=100-999
+```
+
+**Response:** `206 Partial Content` (or `200 OK` for the full file) with `Content-Type: audio/mpeg`, `Accept-Ranges: bytes`.
 
 #### Create or Update Audio Log
 

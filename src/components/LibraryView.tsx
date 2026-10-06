@@ -11,8 +11,12 @@ import {
 } from 'lucide-react';
 import type React from 'react';
 import { useRef, useState } from 'react';
-import { mp3ToUrl, transcriptToCaptionUrl } from '../services/audioUtils';
-import type { StoredAudioLog, StoredSummary } from '../services/storageService';
+import { transcriptToCaptionUrl } from '../services/audioUtils';
+import {
+  getAudioFileUrl,
+  type StoredAudioLog,
+  type StoredSummary,
+} from '../services/storageService';
 import { formatPokemonId } from '../utils/pokemonUtils';
 
 interface LibraryViewProps {
@@ -425,7 +429,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     {audioLog.audioFormat} @ {audioLog.bitrate}kbps
                   </span>
                 </div>
-                <audio controls className="w-full" src={mp3ToUrl(audioLog.audioBase64)}>
+                <audio controls className="w-full" src={getAudioFileUrl(audioLog.id)}>
                   <track
                     kind="captions"
                     src={transcriptToCaptionUrl(summaries.find(s => s.id === audioLog.id)?.summary)}

@@ -141,7 +141,7 @@ CREATE TABLE audio_logs (
   region TEXT NOT NULL,
   generation_id INTEGER NOT NULL,
   voice TEXT NOT NULL,           -- Voice profile (Kore, Zephyr, etc.)
-  audio_base64 TEXT NOT NULL,    -- Base64-encoded audio data
+  audio_path TEXT NOT NULL,      -- MP3 file path relative to the data dir (e.g. audio/1.mp3)
   audio_format TEXT NOT NULL,    -- "mp3"
   bitrate INTEGER NOT NULL,      -- MP3 bitrate in kbps (default: 128)
   created_at TEXT NOT NULL,
@@ -364,7 +364,7 @@ The TTS prompt includes detailed director's notes for voice styling:
 3. Constructs TTS prompt with director's notes
 4. Calls Gemini TTS API (one call per Pokemon, Pro-first with Flash fallback, batch-level quota tracking)
 5. Converts PCM response to MP3 via ffmpeg
-6. Saves audio to database as base64-encoded MP3
+6. Saves audio as an MP3 file under `data/audio/`; the `audio_logs` row stores the file path
 7. Enforces 15-second cooldown between Pokemon
 8. Emits SSE progress events in real-time
 9. On completion or failure, emits terminal SSE event with result metadata
@@ -513,7 +513,7 @@ The SQLite database file (`pokemon_data.db`) is created automatically on first r
 **Audio playback issues:**
 
 - Confirm browser supports MP3 format
-- Check audio data is properly base64 encoded
+- Check the MP3 file exists under `data/audio/` and that `GET /api/audio/{id}/file` streams it
 - Verify ffmpeg-static is installed correctly
 
 ## Future Enhancements

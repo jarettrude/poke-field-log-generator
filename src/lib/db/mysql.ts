@@ -72,6 +72,10 @@ export class MySQLAdapter implements DatabaseAdapter {
     throw new Error('Not implemented');
   }
 
+  async getAudioFilePath(_id: number): Promise<string | null> {
+    throw new Error('Not implemented');
+  }
+
   async deleteAudioLog(_id: number): Promise<void> {
     throw new Error('Not implemented');
   }

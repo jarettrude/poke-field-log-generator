@@ -3,6 +3,7 @@
  * Uses better-sqlite3 for local persistent storage
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import type {
@@ -43,11 +44,19 @@ export class SQLiteAdapter implements DatabaseAdapter {
     this.dbPath = dbPath || path.join(process.cwd(), 'data', 'pokemon_data.db');
   }
 
+  /** Directory holding audio MP3 files, alongside the database file. */
+  private get audioDir(): string {
+    return path.join(path.dirname(this.dbPath), 'audio');
+  }
+
   async initialize(): Promise<void> {
     this._db = new Database(this.dbPath);
 
     // Enable WAL mode for better performance
     this.db.pragma('journal_mode = WAL');
+    // Let contending writers (e.g. a parallel migrator holding BEGIN IMMEDIATE)
+    // wait instead of failing instantly
+    this.db.pragma('busy_timeout = 120000');
 
     // Create summaries table
     this.db.exec(`
@@ -62,7 +71,8 @@ export class SQLiteAdapter implements DatabaseAdapter {
       )
     `);
 
-    // Create audio logs table
+    // Create audio logs table. MP3 payloads live as files under <data>/audio/
+    // (see migrateAudioBlobsToFiles); the table stores only the file path.
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS audio_logs (
         id INTEGER PRIMARY KEY,
@@ -70,7 +80,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
         region TEXT NOT NULL,
         generation_id INTEGER NOT NULL,
         voice TEXT NOT NULL,
-        audio_base64 TEXT NOT NULL,
+        audio_path TEXT NOT NULL,
         audio_format TEXT NOT NULL,
         bitrate INTEGER NOT NULL,
         created_at TEXT NOT NULL,
@@ -78,10 +88,8 @@ export class SQLiteAdapter implements DatabaseAdapter {
       )
     `);
 
-    // Covering index for metadata list queries: audio_base64 blobs make the
-    // table ~GBs, and without this index a metadata-only SELECT still scans
-    // leaf pages scattered among blob overflow pages. The index lets the
-    // query be served entirely from compact index pages.
+    // Covering index for metadata list queries: lets metadata-only SELECTs be
+    // served entirely from compact index pages.
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_audio_logs_metadata
       ON audio_logs (id, name, region, generation_id, voice, audio_format, bitrate, created_at, updated_at)
@@ -244,7 +252,117 @@ export class SQLiteAdapter implements DatabaseAdapter {
       CREATE INDEX IF NOT EXISTS idx_jobs_status_created ON jobs(status, created_at)
     `);
 
+    this.migrateAudioBlobsToFiles();
+
     console.log(`SQLite database initialized at: ${this.dbPath}`);
+  }
+
+  /**
+   * One-time migration: extract base64 MP3 blobs from audio_logs into files
+   * under <data>/audio/, swap the column for audio_path, and reclaim space.
+   * Resumable: extracted rows are marked via audio_path, so an interrupted run
+   * continues where it left off on the next initialize().
+   */
+  private migrateAudioBlobsToFiles(): void {
+    const columnNames = () =>
+      new Set(
+        (
+          this.db.prepare("SELECT name FROM pragma_table_info('audio_logs')").all() as Array<{
+            name: string;
+          }>
+        ).map(c => c.name)
+      );
+
+    if (!columnNames().has('audio_base64')) return;
+
+    fs.mkdirSync(this.audioDir, { recursive: true });
+
+    // Phase A (locked): ensure the marker column exists. BEGIN IMMEDIATE takes
+    // the write lock so parallel initialize() calls serialize; each caller
+    // re-checks inside the lock so only the first does work.
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      if (!columnNames().has('audio_path')) {
+        this.db.exec('ALTER TABLE audio_logs ADD COLUMN audio_path TEXT');
+      }
+      this.db.exec('COMMIT');
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
+    }
+
+    // Phase B (unlocked): stream blobs to files. Unmarked rows re-extract on
+    // the next run if the process dies here; writes go to the same filenames
+    // so re-runs are idempotent.
+    const select = this.db.prepare(
+      'SELECT id, audio_base64 FROM audio_logs WHERE audio_path IS NULL ORDER BY id'
+    );
+    const extractedIds: number[] = [];
+    for (const raw of select.iterate()) {
+      const row = raw as DatabaseRow;
+      const id = row.id as number;
+      const fileName = `${id}.mp3`;
+      fs.writeFileSync(
+        path.join(this.audioDir, fileName),
+        Buffer.from(row.audio_base64 as string, 'base64')
+      );
+      extractedIds.push(id);
+    }
+
+    // Phase C (locked): mark extracted rows and rebuild the table without the
+    // blob column. Re-checked under the lock because a concurrent migrator may
+    // have finished while we extracted.
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      if (!columnNames().has('audio_base64')) {
+        this.db.exec('COMMIT');
+        return;
+      }
+      const update = this.db.prepare('UPDATE audio_logs SET audio_path = ? WHERE id = ?');
+      for (const id of extractedIds) {
+        update.run(`audio/${id}.mp3`, id);
+      }
+      this.db.exec(`
+        CREATE TABLE audio_logs_new (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          region TEXT NOT NULL,
+          generation_id INTEGER NOT NULL,
+          voice TEXT NOT NULL,
+          audio_path TEXT NOT NULL,
+          audio_format TEXT NOT NULL,
+          bitrate INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `);
+      this.db.exec(`
+        INSERT INTO audio_logs_new (id, name, region, generation_id, voice, audio_path, audio_format, bitrate, created_at, updated_at)
+        SELECT id, name, region, generation_id, voice, audio_path, audio_format, bitrate, created_at, updated_at FROM audio_logs
+      `);
+      this.db.exec('DROP TABLE audio_logs');
+      this.db.exec('ALTER TABLE audio_logs_new RENAME TO audio_logs');
+      this.db.exec(
+        'CREATE INDEX IF NOT EXISTS idx_audio_logs_generation ON audio_logs(generation_id)'
+      );
+      this.db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_audio_logs_metadata
+        ON audio_logs (id, name, region, generation_id, voice, audio_format, bitrate, created_at, updated_at)
+      `);
+      this.db.exec('COMMIT');
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
+    }
+
+    if (extractedIds.length > 0) {
+      console.log(
+        `Migrated ${extractedIds.length} audio blobs from audio_logs to ${this.audioDir}`
+      );
+    }
+
+    // Reclaim the freed blob pages (VACUUM cannot run inside a transaction)
+    this.db.exec('VACUUM');
   }
 
   // Summary operations
@@ -300,9 +418,17 @@ export class SQLiteAdapter implements DatabaseAdapter {
   async saveAudioLog(audioLog: AudioLogInput): Promise<void> {
     const now = new Date().toISOString();
 
+    // Write the MP3 payload to disk first (atomic via tmp+rename), then
+    // upsert the row pointing at it.
+    fs.mkdirSync(this.audioDir, { recursive: true });
+    const fileName = `${audioLog.id}.mp3`;
+    const tmpPath = path.join(this.audioDir, `${fileName}.tmp`);
+    fs.writeFileSync(tmpPath, Buffer.from(audioLog.audioBase64, 'base64'));
+    fs.renameSync(tmpPath, path.join(this.audioDir, fileName));
+
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO audio_logs
-      (id, name, region, generation_id, voice, audio_base64, audio_format, bitrate, created_at, updated_at)
+      (id, name, region, generation_id, voice, audio_path, audio_format, bitrate, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM audio_logs WHERE id = ?), ?), ?)
     `);
 
@@ -312,7 +438,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
       audioLog.region,
       audioLog.generationId,
       audioLog.voice,
-      audioLog.audioBase64,
+      `audio/${fileName}`,
       audioLog.audioFormat,
       audioLog.bitrate,
       audioLog.id,
@@ -358,9 +484,31 @@ export class SQLiteAdapter implements DatabaseAdapter {
     return rows.map(this.mapRowToAudioLogMetadata);
   }
 
+  async getAudioFilePath(id: number): Promise<string | null> {
+    const stmt = this.db.prepare('SELECT audio_path FROM audio_logs WHERE id = ?');
+    const row = stmt.get(id) as { audio_path?: string } | undefined;
+    if (!row?.audio_path) return null;
+
+    // Stored paths are relative to the data directory; confine resolution to it.
+    const dataDir = path.resolve(path.dirname(this.dbPath));
+    const resolved = path.resolve(dataDir, row.audio_path);
+    if (!resolved.startsWith(`${dataDir}${path.sep}`) || !fs.existsSync(resolved)) {
+      return null;
+    }
+    return resolved;
+  }
+
   async deleteAudioLog(id: number): Promise<void> {
+    const filePath = await this.getAudioFilePath(id);
     const stmt = this.db.prepare('DELETE FROM audio_logs WHERE id = ?');
     stmt.run(id);
+    if (filePath) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        // File already removed; row deletion is what matters
+      }
+    }
   }
 
   async cachePokemon(pokemon: PokemonInput): Promise<void> {
@@ -691,7 +839,7 @@ export class SQLiteAdapter implements DatabaseAdapter {
       region: row.region as string,
       generationId: row.generation_id as number,
       voice: row.voice as string,
-      audioBase64: row.audio_base64 as string,
+      audioPath: row.audio_path as string,
       audioFormat: row.audio_format as StoredAudioLog['audioFormat'],
       bitrate: row.bitrate as number,
       createdAt: row.created_at as string,

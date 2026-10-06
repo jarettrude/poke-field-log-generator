@@ -20,10 +20,10 @@ import {
 import Image from 'next/image';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { VOICE_OPTIONS } from '../constants';
-import { mp3ToUrl, transcriptToCaptionUrl } from '../services/audioUtils';
+import { transcriptToCaptionUrl } from '../services/audioUtils';
 import {
   type AudioLogMetadata,
-  getAudioLog,
+  getAudioFileUrl,
   type StoredSummary,
   saveSummary,
 } from '../services/storageService';
@@ -57,35 +57,18 @@ interface LazyAudioPlayerProps {
 
 const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId, transcript }) => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
-  const loadAndPlay = useCallback(async () => {
+  const loadAndPlay = useCallback(() => {
     if (audioUrl) {
       // Already loaded, just play
       audioRef.current?.play();
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const audioLog = await getAudioLog(pokemonId);
-      if (!audioLog) {
-        setError('Audio not found');
-        return;
-      }
-      const mp3Url = mp3ToUrl(audioLog.audioBase64);
-      setAudioUrl(mp3Url);
-      // Play after state update via useEffect
-    } catch (e) {
-      setError('Failed to load audio');
-      console.error('Failed to load audio:', e);
-    } finally {
-      setIsLoading(false);
-    }
+    // Point the player at the streaming endpoint; the browser fetches on demand.
+    setAudioUrl(getAudioFileUrl(pokemonId));
   }, [pokemonId, audioUrl]);
 
   useEffect(() => {
@@ -103,26 +86,16 @@ const LazyAudioPlayer: React.FC<LazyAudioPlayerProps> = ({ pokemonId, transcript
     }
   };
 
-  if (error) {
-    return (
-      <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-tertiary)' }}>
-        <Volume2 className="h-4 w-4" />
-        {error}
-      </div>
-    );
-  }
-
   if (!audioUrl) {
     return (
       <button
         type="button"
         onClick={loadAndPlay}
-        disabled={isLoading}
-        className="flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-sm transition-all hover:opacity-80 disabled:opacity-50"
+        className="flex items-center gap-2 rounded-lg px-3 py-2 font-medium text-sm transition-all hover:opacity-80"
         style={{ background: 'var(--accent-secondary)', color: 'var(--text-inverse)' }}
       >
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-        {isLoading ? 'Loading...' : 'Play Audio'}
+        <Play className="h-4 w-4" />
+        Play Audio
       </button>
     );
   }
@@ -606,10 +579,9 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
 
       if (entry.hasAudio && entry.audioMeta) {
         try {
-          const audioLog = await getAudioLog(entry.id);
-          if (audioLog) {
-            const audioBlob = await fetch(mp3ToUrl(audioLog.audioBase64)).then(res => res.blob());
-            folder.file(`${filePrefix}.mp3`, audioBlob);
+          const audioRes = await fetch(getAudioFileUrl(entry.id));
+          if (audioRes.ok) {
+            folder.file(`${filePrefix}.mp3`, await audioRes.blob());
           }
         } catch (e) {
           console.warn(`Failed to fetch audio for ${entry.name}:`, e);

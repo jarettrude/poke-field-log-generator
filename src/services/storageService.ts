@@ -50,7 +50,8 @@ export interface StoredAudioLog {
   region: string;
   generationId: number;
   voice: string;
-  audioBase64: string;
+  /** Path to the MP3 file on the server, relative to the data directory. */
+  audioPath: string;
   audioFormat: 'mp3';
   bitrate: number;
   /** ISO timestamp string. */
@@ -59,7 +60,7 @@ export interface StoredAudioLog {
   updatedAt: string;
 }
 
-/** Audio log metadata (without audioBase64) for list endpoints - prevents RangeError on large datasets */
+/** Audio log metadata (without audioPath) for list endpoints - prevents RangeError on large datasets */
 export interface AudioLogMetadata {
   id: number;
   name: string;
@@ -190,7 +191,13 @@ export const getAudioLog = async (id: number): Promise<StoredAudioLog | null> =>
 };
 
 /**
- * Get all audio logs metadata for a generation (no audioBase64 - use getAudioLog for full data).
+ * URL that streams the MP3 file for a stored audio log. Supports HTTP Range
+ * requests, so it can be assigned directly to an <audio> element's src.
+ */
+export const getAudioFileUrl = (id: number): string => `${API_BASE}/audio/${id}/file`;
+
+/**
+ * Get all audio logs metadata for a generation (no audioPath - use getAudioLog for full data).
  */
 export const getAudioLogsByGeneration = async (
   generationId: number

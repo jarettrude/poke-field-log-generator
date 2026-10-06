@@ -24,7 +24,8 @@ export interface StoredAudioLog {
   region: string;
   generationId: number;
   voice: string;
-  audioBase64: string;
+  /** Path to the MP3 file on disk, relative to the data directory. */
+  audioPath: string;
   audioFormat: 'mp3';
   bitrate: number;
   variantCategory?: VariantCategory;
@@ -32,8 +33,8 @@ export interface StoredAudioLog {
   updatedAt: string;
 }
 
-// Metadata-only version (excludes large audioBase64 field for list endpoints)
-export type AudioLogMetadata = Omit<StoredAudioLog, 'audioBase64'>;
+// Metadata-only version (excludes the file path for list endpoints)
+export type AudioLogMetadata = Omit<StoredAudioLog, 'audioPath'>;
 
 export interface CachedPokemon {
   id: number;
@@ -165,6 +166,8 @@ export interface DatabaseAdapter {
   getAllAudioLogsMetadata(): Promise<AudioLogMetadata[]>;
   getAudioLogsByGeneration(genId: number): Promise<StoredAudioLog[]>;
   getAudioLogsMetadataByGeneration(genId: number): Promise<AudioLogMetadata[]>;
+  /** Absolute path to the stored MP3 file, or null if the log/file is missing. */
+  getAudioFilePath(id: number): Promise<string | null>;
   deleteAudioLog(id: number): Promise<void>;
 
   // Pokemon cache operations

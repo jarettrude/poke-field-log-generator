@@ -2,7 +2,7 @@ import { AlertTriangle, ArrowLeft, CheckCircle, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import type React from 'react';
 import { POKEBALL_IMAGE } from '../constants';
-import { mp3ToUrl, transcriptToCaptionUrl } from '../services/audioUtils';
+import { transcriptToCaptionUrl } from '../services/audioUtils';
 import type { ProcessedPokemon } from '../types';
 import { formatPokemonId } from '../utils/pokemonUtils';
 
@@ -120,11 +120,11 @@ export const ResultsView: React.FC<ResultsViewProps> = ({
             >
               {r.summary}
             </p>
-            {r.audioData && (
+            {r.audioUrl && (
               <audio
                 controls
                 className="h-10 w-full rounded-lg"
-                src={mp3ToUrl(r.audioData)}
+                src={r.audioUrl}
                 style={{ accentColor: 'var(--accent-primary)' }}
               >
                 <track

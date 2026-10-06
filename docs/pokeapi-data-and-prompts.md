@@ -267,7 +267,7 @@ CREATE TABLE audio_logs (
   region TEXT NOT NULL,
   generation_id INTEGER NOT NULL,
   voice TEXT NOT NULL,           -- Voice profile used (e.g., "Kore")
-  audio_base64 TEXT NOT NULL,    -- Base64-encoded audio data
+  audio_path TEXT NOT NULL,      -- MP3 file path relative to the data dir (e.g. audio/1.mp3)
   audio_format TEXT NOT NULL,    -- "mp3"
   bitrate INTEGER NOT NULL,      -- MP3 bitrate in kbps (default: 128)
   created_at TEXT NOT NULL,

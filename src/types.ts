@@ -92,7 +92,8 @@ export interface ProcessedPokemon {
   name: string;
   displayName?: string;
   summary: string;
-  audioData: string;
+  /** URL that streams the MP3 audio (e.g. /api/audio/[id]/file), empty when none. */
+  audioUrl: string;
   pngData: string | null;
   svgData: string | null;
   variantCategory?: VariantCategory;
