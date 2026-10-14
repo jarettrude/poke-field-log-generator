@@ -9,6 +9,8 @@ import {
   BookMarked,
   BookOpen,
   Home,
+  LogIn,
+  LogOut,
   Menu,
   Monitor,
   Moon,
@@ -23,7 +25,12 @@ import type React from 'react';
 import { useState } from 'react';
 import { useTheme } from './ThemeProvider';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  /** When false, hides authed-only nav entries and shows a Log in link. */
+  authed?: boolean;
+}
+
+export const Header: React.FC<HeaderProps> = ({ authed = true }) => {
   const { theme, setTheme } = useTheme();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -40,12 +47,14 @@ export const Header: React.FC = () => {
 
   const ThemeIcon = theme === 'light' ? Sun : theme === 'dark' ? Moon : Monitor;
 
-  const navItems = [
-    { href: '/', label: 'Home', icon: Home },
-    { href: '/generator', label: 'Generator', icon: Wand2 },
-    { href: '/library', label: 'Pokédex', icon: BookOpen },
-    { href: '/admin', label: 'Settings', icon: Settings },
-  ];
+  const navItems = authed
+    ? [
+        { href: '/', label: 'Home', icon: Home },
+        { href: '/generator', label: 'Generator', icon: Wand2 },
+        { href: '/pokedex', label: 'Pokédex', icon: BookOpen },
+        { href: '/admin', label: 'Settings', icon: Settings },
+      ]
+    : [{ href: '/pokedex', label: 'Pokédex', icon: BookOpen }];
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
@@ -97,6 +106,17 @@ export const Header: React.FC = () => {
           >
             <ThemeIcon className="h-4 w-4" />
           </button>
+
+          {/* Plain <a> — never a <Link>, so prefetch can't hit the logout route */}
+          {authed ? (
+            <a href="/api/auth/logout" className="btn btn-ghost" title="Log out">
+              <LogOut className="h-4 w-4" />
+            </a>
+          ) : (
+            <Link href="/login" className="btn btn-ghost" title="Log in">
+              <LogIn className="h-4 w-4" />
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-2 md:hidden">
@@ -145,6 +165,26 @@ export const Header: React.FC = () => {
                 </Link>
               );
             })}
+            {authed ? (
+              <a
+                href="/api/auth/logout"
+                className="flex items-center gap-3 rounded-lg px-4 py-3 transition-all"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <LogOut className="h-5 w-5" />
+                <span className="font-medium">Log out</span>
+              </a>
+            ) : (
+              <Link
+                href="/login"
+                onClick={closeMobileMenu}
+                className="flex items-center gap-3 rounded-lg px-4 py-3 transition-all"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <LogIn className="h-5 w-5" />
+                <span className="font-medium">Log in</span>
+              </Link>
+            )}
           </nav>
         </div>
       )}

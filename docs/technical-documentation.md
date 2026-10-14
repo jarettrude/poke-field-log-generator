@@ -33,10 +33,11 @@ src/
 │   │   ├── pokemon/         # Pokemon data caching + thumbnails
 │   │   ├── prompts/         # Prompt customization
 │   │   └── summaries/       # Summary CRUD operations
-│   ├── admin/               # Admin page
-│   ├── generator/           # Generator page
-│   ├── library/             # Library page
-│   ├── page.tsx             # Main application interface
+│   ├── admin/               # Admin page (login required)
+│   ├── generator/           # Generator page (login required)
+│   ├── login/               # Password login page
+│   ├── pokedex/             # Pokédex page (public, read-only when logged out)
+│   ├── page.tsx             # Home page (login required; anonymous → /pokedex)
 │   └── layout.tsx           # Root layout
 ├── components/
 │   ├── AdminView.tsx        # Admin panel component
@@ -400,6 +401,8 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 ```bash
 DB_TYPE=sqlite                 # Database type (sqlite or mysql)
+POKEDEX_PASSWORD=              # Shared password that unlocks editing/generation.
+                               # Empty = auth disabled, everything open (dev mode).
 ```
 
 ## Development
@@ -464,6 +467,21 @@ The project uses:
 - JSON columns for array data storage
 
 ## Security
+
+### Password Gate
+
+- `POKEDEX_PASSWORD` gates everything except the read-only Pokédex view.
+- Anonymous visitors can browse `/pokedex` (search, filters, text, audio
+  playback) but see no selection/edit/delete/generate controls.
+- Login sets an `httpOnly` session cookie (`pokedex_session`) whose value is
+  an HMAC-SHA256 of the password — the password itself is never stored or
+  sent to the client. `Secure` is set automatically when the request arrives
+  over https (`x-forwarded-proto`).
+- `src/proxy.ts` enforces access: public GETs are allowlisted
+  (`/api/summaries`, `/api/audio`, `/api/audio/{id}/file`, `/api/pokemon`),
+  all other API routes return 401 and all other pages redirect to `/login`.
+- `/api/auth/login` is rate-limited (8 failures per 10 minutes per IP).
+- With `POKEDEX_PASSWORD` unset the gate is disabled entirely.
 
 ### API Key Protection
 

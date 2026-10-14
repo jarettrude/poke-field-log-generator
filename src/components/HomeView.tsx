@@ -53,7 +53,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ summaryCount, audioCount }) 
         </Link>
 
         <Link
-          href="/library"
+          href="/pokedex"
           className="card group relative p-8 text-left transition-all hover:shadow-xl"
           style={{ borderWidth: '3px', borderColor: 'var(--border-primary)' }}
         >
@@ -64,7 +64,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ summaryCount, audioCount }) 
             <BookOpen className="h-7 w-7" />
           </div>
           <h3 className="mb-2 font-bold text-xl" style={{ color: 'var(--text-primary)' }}>
-            View Library
+            View Pokédex
           </h3>
           <p className="mb-4 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             Browse, play, and download your saved field logs. Manage your Pokédex collection.
@@ -73,7 +73,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ summaryCount, audioCount }) 
             className="inline-flex items-center gap-2 font-semibold text-sm"
             style={{ color: 'var(--accent-secondary)' }}
           >
-            Open library <ArrowRight className="h-4 w-4" />
+            Open Pokédex <ArrowRight className="h-4 w-4" />
           </span>
 
           {(summaryCount > 0 || audioCount > 0) && (

@@ -18,7 +18,12 @@ import type { ProcessedPokemon } from '@/types';
 
 type LibraryView = 'library' | 'results';
 
-function LibraryPageInner() {
+interface PokedexPageClientProps {
+  /** When false, renders a read-only Pokédex: no selection, editing, or generation. */
+  canEdit: boolean;
+}
+
+function LibraryPageInner({ canEdit }: PokedexPageClientProps) {
   const { showToast } = useToast();
   const { savedSummaries, savedAudioLogs, refreshData } = useSavedData();
   const [selectedVoice, setSelectedVoice] = useState('Kore');
@@ -124,7 +129,7 @@ function LibraryPageInner() {
 
   return (
     <div className="min-h-screen bg-transparent">
-      <Header />
+      <Header authed={canEdit} />
 
       <main className="pb-20">
         {currentView === 'library' && (
@@ -132,15 +137,24 @@ function LibraryPageInner() {
             summaries={savedSummaries}
             audioLogs={savedAudioLogs}
             onRefresh={refreshData}
-            onDeleteSummaries={async (ids: number[]) => {
-              await deleteSummaries(ids);
-              await refreshData();
-            }}
-            onDeleteAudio={async (ids: number[]) => {
-              await deleteAudioLogs(ids);
-              await refreshData();
-            }}
-            onGenerateAudio={handleGenerateAudio}
+            canEdit={canEdit}
+            onDeleteSummaries={
+              canEdit
+                ? async (ids: number[]) => {
+                    await deleteSummaries(ids);
+                    await refreshData();
+                  }
+                : undefined
+            }
+            onDeleteAudio={
+              canEdit
+                ? async (ids: number[]) => {
+                    await deleteAudioLogs(ids);
+                    await refreshData();
+                  }
+                : undefined
+            }
+            onGenerateAudio={canEdit ? handleGenerateAudio : undefined}
             isGenerating={isProcessing}
             selectedVoice={selectedVoice}
             onVoiceChange={setSelectedVoice}
@@ -188,11 +202,11 @@ function LibraryPageInner() {
   );
 }
 
-export default function LibraryPage() {
+export function PokedexPageClient({ canEdit }: PokedexPageClientProps) {
   return (
     <ThemeProvider>
       <ToastProvider>
-        <LibraryPageInner />
+        <LibraryPageInner canEdit={canEdit} />
       </ToastProvider>
     </ThemeProvider>
   );

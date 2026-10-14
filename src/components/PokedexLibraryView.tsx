@@ -146,6 +146,8 @@ interface PokedexLibraryViewProps {
   summaries: StoredSummary[];
   audioLogs: AudioLogMetadata[];
   onRefresh: () => void;
+  /** Anonymous visitors get a read-only view: no selection, editing, or deletion. */
+  canEdit?: boolean;
   onDeleteSummaries?: (ids: number[]) => Promise<void>;
   onDeleteAudio?: (ids: number[]) => Promise<void>;
   onGenerateAudio?: (ids: number[]) => void;
@@ -158,6 +160,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
   summaries,
   audioLogs,
   onRefresh,
+  canEdit = false,
   onDeleteSummaries,
   onDeleteAudio,
   onGenerateAudio,
@@ -703,8 +706,8 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
             {filteredEntries.length === entries.length
               ? `${entries.length} entries`
-              : `${filteredEntries.length} of ${entries.length} entries`}{' '}
-            • {selectedIds.size} selected
+              : `${filteredEntries.length} of ${entries.length} entries`}
+            {canEdit && ` • ${selectedIds.size} selected`}
           </p>
         </div>
 
@@ -892,44 +895,48 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
           ))}
         </div>
 
-        {/* Divider */}
-        <div className="h-6 w-px" style={{ background: 'var(--border-secondary)' }} />
+        {canEdit && (
+          <>
+            {/* Divider */}
+            <div className="h-6 w-px" style={{ background: 'var(--border-secondary)' }} />
 
-        {/* Selection Mode */}
-        <span className="font-semibold text-xs" style={{ color: 'var(--text-secondary)' }}>
-          Select:
-        </span>
-        {[
-          { mode: 'manual' as const, label: 'Manual' },
-          { mode: 'range' as const, label: 'Range' },
-          { mode: 'generation' as const, label: 'Gen' },
-          { mode: 'region' as const, label: 'Region' },
-          { mode: 'has-text' as const, label: 'Has Text' },
-          { mode: 'has-audio' as const, label: 'Has Audio' },
-        ].map(({ mode, label }) => (
-          <button
-            type="button"
-            key={mode}
-            onClick={() => handleSelectionModeChange(mode)}
-            className="rounded-lg px-3 py-1 font-semibold text-xs transition-all"
-            style={
-              selectionMode === mode
-                ? {
-                    background: 'var(--accent-secondary)',
-                    color: 'var(--text-inverse)',
-                  }
-                : {
-                    background: 'var(--bg-secondary)',
-                    color: 'var(--text-secondary)',
-                  }
-            }
-          >
-            {label}
-          </button>
-        ))}
+            {/* Selection Mode */}
+            <span className="font-semibold text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Select:
+            </span>
+            {[
+              { mode: 'manual' as const, label: 'Manual' },
+              { mode: 'range' as const, label: 'Range' },
+              { mode: 'generation' as const, label: 'Gen' },
+              { mode: 'region' as const, label: 'Region' },
+              { mode: 'has-text' as const, label: 'Has Text' },
+              { mode: 'has-audio' as const, label: 'Has Audio' },
+            ].map(({ mode, label }) => (
+              <button
+                type="button"
+                key={mode}
+                onClick={() => handleSelectionModeChange(mode)}
+                className="rounded-lg px-3 py-1 font-semibold text-xs transition-all"
+                style={
+                  selectionMode === mode
+                    ? {
+                        background: 'var(--accent-secondary)',
+                        color: 'var(--text-inverse)',
+                      }
+                    : {
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-secondary)',
+                      }
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </>
+        )}
 
         {/* Range Inputs */}
-        {selectionMode === 'range' && filteredIdBounds && (
+        {canEdit && selectionMode === 'range' && filteredIdBounds && (
           <>
             <input
               type="number"
@@ -969,7 +976,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
         )}
 
         {/* Clear Selection */}
-        {selectedIds.size > 0 && (
+        {canEdit && selectedIds.size > 0 && (
           <button
             type="button"
             onClick={() => {
@@ -1007,18 +1014,20 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                 containIntrinsicSize: 'auto 420px',
               }}
             >
-              <button
-                type="button"
-                onClick={() => toggleSelect(entry.id)}
-                className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all"
-                style={{
-                  background: isSelected ? 'var(--accent-primary)' : 'var(--surface-card)',
-                  borderColor: isSelected ? 'var(--accent-primary)' : 'var(--border-secondary)',
-                  color: isSelected ? 'var(--text-inverse)' : 'var(--text-tertiary)',
-                }}
-              >
-                {isSelected && <Check className="h-5 w-5" />}
-              </button>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => toggleSelect(entry.id)}
+                  className="absolute top-4 right-4 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all"
+                  style={{
+                    background: isSelected ? 'var(--accent-primary)' : 'var(--surface-card)',
+                    borderColor: isSelected ? 'var(--accent-primary)' : 'var(--border-secondary)',
+                    color: isSelected ? 'var(--text-inverse)' : 'var(--text-tertiary)',
+                  }}
+                >
+                  {isSelected && <Check className="h-5 w-5" />}
+                </button>
+              )}
 
               <div className="relative h-48 p-6" style={{ background: 'var(--bg-secondary)' }}>
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
@@ -1090,7 +1099,7 @@ export const PokedexLibraryView: React.FC<PokedexLibraryViewProps> = ({
                       >
                         Script
                       </span>
-                      {!isEditingSummary ? (
+                      {!canEdit ? null : !isEditingSummary ? (
                         <button
                           type="button"
                           onClick={() => startEditingSummary(entry)}
